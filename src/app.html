@@ -59,6 +59,7 @@ button.btn,label.btn{display:inline-flex;align-items:center;gap:6px;border:1px s
 button.btn.primario,label.btn.primario{background:var(--accent);color:var(--accent-ink);border-color:transparent}
 button.btn.peligro{color:var(--crit)}
 button.btn:hover,label.btn:hover{filter:brightness(.96)}
+button.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
 .anios{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px;margin:10px 0}
 .anios button{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:10px;padding:6px 4px;cursor:pointer;font:inherit;text-align:center}
 .anios button b{display:block;font-size:.98rem}
@@ -199,6 +200,7 @@ table.factores tr.grupo td{background:var(--surface2)}
       <label class="btn primario">Seleccionar archivos SIMAT<input type="file" id="archivosSimat" accept=".txt,.csv,.zip" multiple hidden></label>
       <span class="nota">o arrástrelos aquí</span>
     </div>
+    <label class="nota" style="display:flex;gap:8px;align-items:flex-start;margin-top:10px"><input type="checkbox" id="chkNominal" style="margin-top:3px"> <span><b>Generar listado nominal de alerta temprana</b> para el último año cargado (nombre, documento, institución, sede, grado y grupo de los estudiantes en riesgo alto o medio y de los retirados). Contiene datos personales: se mantiene solo en memoria mientras la página esté abierta, se descarga desde la pestaña «4. Abandono» y nunca se guarda en la aplicación.</span></label>
     <p class="nota" id="progresoSimat" role="status"></p>
     <div id="filtrosSimat"></div>
     <div class="tabla-wrap" id="wrapSimat" style="display:none;margin-top:10px"><table id="tablaSimat"></table></div>
@@ -650,6 +652,7 @@ function exportarExcel(){
     Object.keys(AB.vars.tipoDisc).forEach(function(c){ var o = AB.vars.tipoDisc[c]; ff.push(["Tipo de discapacidad", c, o[0], o[1], r1(o[1] / o[0] * 100), null, null, null, null]); });
     Object.keys(AB.grado).sort(function(a,b){ return a-b; }).forEach(function(g){ var o = AB.grado[g]; ff.push(["Grado", g + "°", o[0], o[1], r1(o[1] / o[0] * 100), null, null, null, null]); });
     XLSX.utils.book_append_sheet(wb, anchos(XLSX.utils.aoa_to_sheet(ff),[30,30,16,12,13,12,14,14,10]), "Abandono_factores");
+    agregarHojasAlerta(wb, AB);
     if (AB.cohorte){ var CO = AB.cohorte, fc = [["Cohorte de 1° en " + CO.anio0 + " seguida por PER_ID hasta " + CO.anioFin], ["Situación","Estudiantes","%"],
         ["En " + CO.gradoEsperado + "° a tiempo", CO.aTiempo, r1(CO.aTiempo / CO.n * 100)]];
       Object.keys(CO.rezago).sort(function(a,b){ return a-b; }).forEach(function(g){ fc.push(["Rezagado en " + g + "°", CO.rezago[g], r1(CO.rezago[g] / CO.n * 100)]); });
@@ -983,7 +986,7 @@ function cargarSimat(files){
   var lista = Array.prototype.slice.call(files), prog = document.getElementById("progresoSimat"), msgs = [];
   if (!lista.length) return;
   prog.textContent = "Identificando el año de cada archivo…";
-  var an = ABANDONO.nuevo(), P = null, A = null, cohorteRota = false;
+  var an = ABANDONO.nuevo(), P = null, A = null, cohorteRota = false, ultimoAnio = null, nominal = document.getElementById("chkNominal").checked;
   var contar = function(e){ return filtroSimat().est.indexOf(e) >= 0; };
   var resolver = function(sede, inst){ return (S.reasignar && S.reasignar[sede]) || municipioDeCodigo(sede) || municipioDeCodigo(inst); };
   function avanzar(N){
@@ -996,6 +999,7 @@ function cargarSimat(files){
   }
   Promise.all(lista.map(function(f){ return anioDeArchivo(f).catch(function(){ return null; }); })).then(function(anios){
     var orden = lista.map(function(f, i){ return {f:f, a:anios[i]}; }).sort(function(x, y){ return (x.a || 9999) - (y.a || 9999); });
+    orden.forEach(function(o){ if (o.a && (!ultimoAnio || o.a > ultimoAnio)) ultimoAnio = o.a; });
     var i = 0;
     (function siguiente(){
       if (i >= orden.length){
@@ -1006,6 +1010,12 @@ function cargarSimat(files){
           if (pares.length){
             S.abandono = ABANDONO.resumen(an);
             S.abandono.aniosCargados = Object.keys(an.anios).map(Number);
+            var AL = ABANDONO.alerta(P, S.abandono.modelo, function(r){ return (S.sedeInfo[r.sc] || {}).i || r.ci; });
+            if (AL){
+              listadoNominal = nominal && AL.nominal.length ? {anio:AL.anio, umbrales:AL.umbrales, filas:AL.nominal} : null;
+              delete AL.nominal; S.abandono.alerta = AL;
+              if (listadoNominal) msgs.push("Listado nominal de alerta temprana listo para descargar en la pestaña «4. Abandono» (" + fmt(listadoNominal.filas.length, 0) + " estudiantes).");
+            }
           } else if (orden.length) msgs.push("Para el análisis de abandono cargue juntos al menos dos años consecutivos (idealmente 2016 a 2026).");
           an = null; P = null; A = null;
           S.ejemplo = false; aplicarSimat(); renderSimat();
@@ -1024,7 +1034,7 @@ function cargarSimat(files){
             delete d.info;
             if (S.simat[d.anio] && S.simat[d.anio].archivo !== d.archivo) msgs.push("El año " + d.anio + " se reemplazó con " + d.archivo + ".");
             S.simat[d.anio] = d;
-            var R = ABANDONO.leerAnio(t.texto, d.anio, resolver);
+            var R = ABANDONO.leerAnio(t.texto, d.anio, resolver, {nominal: nominal && d.anio === ultimoAnio});
             if (R){ if (A && R.anio <= A.anio) msgs.push("El archivo de " + R.anio + " no está en orden cronológico; el análisis de abandono puede quedar incompleto."); else avanzar(R); }
           });
         });
@@ -1336,8 +1346,127 @@ function dibujarAbandono(R, pre){
 function renderAbandonoTab(){
   destruir();
   var el = document.getElementById("vistaAbandono");
-  el.innerHTML = htmlAbandono(S.abandono, "ab");
-  dibujarAbandono(S.abandono, "ab");
+  el.innerHTML = htmlAbandono(S.abandono, "ab") + htmlComparacion(S.abandono, "ab") + htmlAlerta(S.abandono, "ab", true);
+  dibujarAbandono(S.abandono, "ab"); dibujarComparacion(S.abandono, "ab"); activarAlerta(S.abandono, "ab");
+}
+
+/* ---------- Comparación ajustada entre municipios y sistema de alerta temprana ---------- */
+var listadoNominal = null; // solo en memoria durante la sesión; nunca se guarda
+function oeMunicipios(R){
+  var M = R && R.modelo; if (!M || !M.porMunicipio) return [];
+  var dep = {n:0, ind:{}};
+  Object.keys(M.porMunicipio).forEach(function(m){ var o = M.porMunicipio[m]; dep.n += o.n; Object.keys(o.ind).forEach(function(k){ dep.ind[k] = (dep.ind[k] || 0) + o.ind[k]; }); });
+  return Object.keys(M.porMunicipio).map(function(m){
+    var o = M.porMunicipio[m], oe = o.obs / o.esp, se = 1 / Math.sqrt(Math.max(o.obs, 1));
+    var lo = oe * Math.exp(-1.96 * se), hi = oe * Math.exp(1.96 * se), ind = {};
+    ABANDONO.INDICADORES.forEach(function(x){ ind[x.id] = {v:(o.ind[x.id] || 0) / o.n * 100, dep:(dep.ind[x.id] || 0) / dep.n * 100}; });
+    return {m:m, n:o.n, obs:o.obs / o.n * 100, esp:o.esp / o.n * 100, oe:oe, lo:lo, hi:hi, clase: lo > 1 ? "mayor" : hi < 1 ? "menor" : "igual", ind:ind};
+  }).sort(function(a, b){ return b.oe - a.oe; });
+}
+function htmlComparacion(R, pre){
+  var L = oeMunicipios(R); if (!L.length) return "";
+  var M = R.modelo, may = L.filter(function(x){ return x.clase === "mayor"; }), men = L.filter(function(x){ return x.clase === "menor"; });
+  var altoEsp = L.slice().sort(function(a, b){ return b.esp - a.esp; }).slice(0, 5);
+  var IND = ABANDONO.INDICADORES.filter(function(x){ return ["extra","repite","nuevo","migr","rural","flex"].indexOf(x.id) >= 0; });
+  var h = '<h3>Comparación entre municipios según el perfil de sus estudiantes</h3>';
+  h += '<p>El abandono de un municipio depende en parte de quiénes son sus estudiantes: hay municipios con más extraedad, repitencia, población migrante o zona rural. Con el modelo se calcula cuántos abandonos serían <b>esperables</b> dado ese perfil y se comparan con los <b>observados</b> (' + M.anios[0] + '–' + M.anios[M.anios.length-1] + '). Una razón observado/esperado mayor que 1 indica más abandono del que explica el perfil: hay factores del municipio o de sus instituciones que conviene revisar.</p>';
+  h += '<p>' + (may.length ? '<b>Más abandono del esperado</b> (' + may.length + '): ' + lista(may.slice(0, 8).map(function(x){ return x.m + " (" + fmt(x.oe, 2) + ")"; })) + (may.length > 8 ? ' y otros' : '') + '. ' : '') +
+    (men.length ? '<b>Menos abandono del esperado</b> (' + men.length + '): ' + lista(men.slice().reverse().slice(0, 8).map(function(x){ return x.m + " (" + fmt(x.oe, 2) + ")"; })) + (men.length > 8 ? ' y otros' : '') + '; sus prácticas pueden servir de referencia. ' : '') +
+    'Los municipios con mayor abandono <b>esperado</b> por el perfil de sus estudiantes son ' + lista(altoEsp.map(function(x){ return x.m + " (" + pct(x.esp) + ")"; })) + ': allí el reto es sobre todo de extraedad, repitencia o ruralidad.</p>';
+  h += '<div class="grafico" style="height:' + (L.length * 18 + 70) + 'px"><canvas id="' + pre + '-oe"></canvas></div>';
+  h += '<div class="fuente">Gráfico. Razón entre el abandono observado y el esperado según el perfil de los estudiantes, por municipio (' + M.anios[0] + '–' + M.anios[M.anios.length-1] + '). La línea marca 1: abandono igual al esperado.</div>';
+  h += '<div class="tabla-wrap"><table><thead><tr><th>Municipio</th><th class="num">Abandono observado</th><th class="num">Esperado por perfil</th><th class="num">Observado / esperado</th><th></th>' +
+    IND.map(function(x){ return '<th class="num">' + esc(x.n) + '</th>'; }).join("") + '</tr></thead><tbody>';
+  L.forEach(function(x){
+    h += '<tr><td>' + esc(x.m) + '</td><td class="num">' + pct(x.obs) + '</td><td class="num">' + pct(x.esp) + '</td><td class="num"><b>' + fmt(x.oe, 2) + '</b> <span class="nota">(' + fmt(x.lo, 2) + '–' + fmt(x.hi, 2) + ')</span></td><td>' +
+      (x.clase === "mayor" ? '<span class="etq alerta">▲ mayor que el esperado</span>' : x.clase === "menor" ? '<span class="etq ok">▼ menor que el esperado</span>' : '<span class="nota">como el esperado</span>') + '</td>' +
+      IND.map(function(k){ var d = x.ind[k.id], alto = d.v >= 1.5 * d.dep && d.v >= 2; return '<td class="num"' + (alto ? ' style="font-weight:700;color:var(--warn-text)" title="1,5 veces o más el promedio departamental"' : '') + '>' + fmt(d.v, 1) + '</td>'; }).join("") + '</tr>';
+  });
+  var d0 = L[0].ind;
+  h += '<tr><td><b>Promedio departamental</b></td><td></td><td></td><td></td><td></td>' + IND.map(function(k){ return '<td class="num"><b>' + fmt(d0[k.id].dep, 1) + '</b></td>'; }).join("") + '</tr>';
+  h += '</tbody></table></div><p class="fuente">Porcentajes de estudiantes-año de 1° a 10°. En negrilla y color, los indicadores que igualan o superan 1,5 veces el promedio departamental. Entre paréntesis, intervalo de confianza del 95 % de la razón.</p>';
+  return h;
+}
+function htmlAlerta(R, pre, completo){
+  var A = R && R.alerta; if (!A) return "";
+  var T = A.total, M = R.modelo, h = '<h3>Sistema de alerta temprana ' + A.anio + '</h3>';
+  h += '<p>El modelo se aplica a cada estudiante matriculado en ' + A.anio + ' en 1° a 10° según sus características (extraedad, repitencia, llegada reciente, origen, zona, modelo educativo, etc.) para estimar su riesgo de abandonar. Riesgo <b>alto</b>: ' + fmt(A.umbrales[1] * 100, 0) + ' % o más (el doble del promedio); <b>medio</b>: entre ' + fmt(A.umbrales[0] * 100, 0) + ' % y ' + fmt(A.umbrales[1] * 100, 0) + ' %. Los retirados en ' + A.anio + ' se listan aparte para búsqueda activa y reintegro. La capacidad del modelo para distinguir a quienes abandonan (AUC) es ' + fmt(M.auc, 2) + ': sirve para priorizar instituciones y grupos, no como predicción individual exacta; la alerta debe complementarse con el conocimiento de docentes y orientadores y con el SIMPADE.</p>';
+  h += '<div class="kpis">' + kpi(fmt(T.alto, 0), "estudiantes en riesgo alto", pct(T.alto / T.n * 100) + " de " + fmt(T.n, 0) + " matriculados en 1° a 10°") +
+    kpi(fmt(T.medio, 0), "estudiantes en riesgo medio", pct(T.medio / T.n * 100)) +
+    kpi(fmt(T.retirados, 0), "retirados en " + A.anio + " (búsqueda activa)", "") +
+    kpi(fmt(T.esp, 0), "abandonos esperados para " + (A.anio + 1) + " si no se actúa", pct(T.esp / T.n * 100) + " de los matriculados en 1° a 10°") + '</div>';
+  var lista_ = A.porInstitucion.slice().sort(function(a, b){ return b.alto - a.alto || b.esp - a.esp; });
+  if (completo){
+    var munis = Object.keys(A.porMunicipio).sort(function(a, b){ return a.localeCompare(b, "es"); });
+    h += '<div class="fila no-print" style="margin:8px 0"><label class="nota">Municipio <select class="txt" id="' + pre + '-filtro" style="width:auto"><option value="">Todos</option>' + munis.map(function(m){ return '<option>' + esc(m) + '</option>'; }).join("") + '</select></label>' +
+      '<button class="btn" id="' + pre + '-xinst">Descargar alertas por institución (Excel)</button>' +
+      '<button class="btn primario" id="' + pre + '-xnom"' + (listadoNominal ? '' : ' disabled title="Vuelva a cargar los archivos con la opción de listado nominal marcada"') + '>Descargar listado nominal (confidencial)</button></div>';
+    if (!listadoNominal) h += '<p class="nota no-print">Para generar el listado nominal de estudiantes en alerta, marque «Generar listado nominal de alerta temprana» en «3. Datos y parámetros» y vuelva a cargar los archivos del SIMAT. El listado no se guarda en la aplicación.</p>';
+  }
+  h += '<div class="tabla-wrap"><table id="' + pre + '-tinst"><thead><tr><th>Municipio</th><th>Institución</th><th class="num">Matriculados 1°–10°</th><th class="num">Riesgo alto</th><th class="num">Riesgo medio</th><th class="num">Riesgo promedio</th><th class="num">Retirados ' + A.anio + '</th><th class="num">Extraedad</th><th class="num">Repitentes</th><th class="num">Llegaron este año</th></tr></thead><tbody>' +
+    filasAlerta(completo ? lista_ : lista_.slice(0, 25)) + '</tbody></table></div>';
+  if (!completo) h += '<p class="fuente">Las 25 instituciones con más estudiantes en riesgo alto. La lista completa está en la pestaña «4. Abandono» y en la exportación a Excel.</p>';
+  return h;
+}
+function filasAlerta(L){
+  return L.map(function(o){
+    return '<tr><td>' + esc(o.m) + '</td><td style="white-space:normal;min-width:220px">' + esc(o.nombre) + '</td><td class="num">' + fmt(o.n, 0) + '</td><td class="num"><b>' + fmt(o.alto, 0) + '</b></td><td class="num">' + fmt(o.medio, 0) +
+      '</td><td class="num">' + (o.n ? pct(o.esp / o.n * 100) : "—") + '</td><td class="num">' + fmt(o.retirados, 0) + '</td><td class="num">' + (o.n ? pct(o.extra / o.n * 100, 0) : "—") + '</td><td class="num">' + (o.n ? pct(o.repite / o.n * 100, 0) : "—") + '</td><td class="num">' + (o.n ? pct(o.nuevo / o.n * 100, 0) : "—") + '</td></tr>';
+  }).join("");
+}
+function dibujarComparacion(R, pre){
+  var c = document.getElementById(pre + "-oe"); if (!c) return;
+  var L = oeMunicipios(R), o = baseOpts(), eje = {grid:{color:o.grid}, border:{color:o.grid}, ticks:{color:o.ink2}};
+  graficos.push(new Chart(c, {type:"bar", plugins:[pluginReferencias],
+    data:{labels:L.map(function(x){ return x.m; }), datasets:[{data:L.map(function(x){ return x.oe; }), backgroundColor:L.map(function(x){ return x.clase === "mayor" ? o.s2 : o.s1; }), borderRadius:{topRight:4, bottomRight:4}, borderSkipped:"start", barPercentage:.75, categoryPercentage:.9}]},
+    options:{indexAxis:"y", responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{legend:{display:false}, referencias:{lineas:[{v:1, t:"Igual al esperado", color:o.ref1}]},
+        tooltip:{callbacks:{label:function(x){ var r = L[x.dataIndex]; return [" Observado/esperado: " + fmt(r.oe, 2) + " (" + fmt(r.lo, 2) + "–" + fmt(r.hi, 2) + ")", " Abandono observado: " + pct(r.obs), " Esperado por perfil: " + pct(r.esp)]; }}}},
+      scales:{x:Object.assign({}, eje, {min:0, position:"top"}), y:{grid:{display:false}, ticks:{color:o.ink2, autoSkip:false, font:{size:11}}}}}}));
+}
+function activarAlerta(R, pre){
+  var A = R && R.alerta; if (!A) return;
+  var sel = document.getElementById(pre + "-filtro");
+  if (sel) sel.addEventListener("change", function(){
+    var L = A.porInstitucion.filter(function(o){ return !sel.value || o.m === sel.value; }).sort(function(a, b){ return b.alto - a.alto || b.esp - a.esp; });
+    document.querySelector("#" + pre + "-tinst tbody").innerHTML = filasAlerta(L);
+  });
+  var bi = document.getElementById(pre + "-xinst");
+  if (bi) bi.addEventListener("click", function(){ var wb = XLSX.utils.book_new(); agregarHojasAlerta(wb, R); XLSX.writeFile(wb, "alerta_temprana_instituciones_" + A.anio + ".xlsx"); });
+  var bn = document.getElementById(pre + "-xnom");
+  if (bn) bn.addEventListener("click", descargarNominal);
+}
+function agregarHojasAlerta(wb, R){
+  var A = R.alerta, L = oeMunicipios(R);
+  if (L.length){
+    var f = [["Municipio","Estudiantes-año 1°-10°","Abandono observado (%)","Abandono esperado por perfil (%)","Observado/esperado","IC 95% inf","IC 95% sup","Interpretación"].concat(ABANDONO.INDICADORES.map(function(x){ return x.n + " (%)"; }))];
+    L.forEach(function(x){ f.push([x.m, x.n, r1(x.obs), r1(x.esp), Math.round(x.oe * 100) / 100, Math.round(x.lo * 100) / 100, Math.round(x.hi * 100) / 100, x.clase === "mayor" ? "Mayor que el esperado" : x.clase === "menor" ? "Menor que el esperado" : "Como el esperado"].concat(ABANDONO.INDICADORES.map(function(k){ return r1(x.ind[k.id].v); }))); });
+    XLSX.utils.book_append_sheet(wb, anchos(XLSX.utils.aoa_to_sheet(f), [20,14,14,16,12,10,10,22,12,12,12,12,12,14,14,12]), "Municipios_ajustado");
+  }
+  if (A){
+    var g = [["Municipio","Código DANE institución","Institución","Matriculados 1°-10° " + A.anio,"Riesgo alto","Riesgo medio","Abandonos esperados","Riesgo promedio (%)","Retirados " + A.anio,"Extraedad (%)","Repitentes (%)","Llegaron este año (%)","Migrantes (%)"]];
+    A.porInstitucion.slice().sort(function(a, b){ return a.m.localeCompare(b.m, "es") || b.alto - a.alto; }).forEach(function(o){
+      g.push([o.m, o.ci, o.nombre, o.n, o.alto, o.medio, r1(o.esp), o.n ? r1(o.esp / o.n * 100) : null, o.retirados, o.n ? r1(o.extra / o.n * 100) : null, o.n ? r1(o.repite / o.n * 100) : null, o.n ? r1(o.nuevo / o.n * 100) : null, o.n ? r1(o.migr / o.n * 100) : null]); });
+    XLSX.utils.book_append_sheet(wb, anchos(XLSX.utils.aoa_to_sheet(g), [18,16,50,14,10,10,12,12,12,10,10,12,10]), "Alerta_instituciones");
+  }
+}
+function descargarNominal(){
+  if (!listadoNominal) return;
+  var N = listadoNominal, wb = XLSX.utils.book_new();
+  var ins = XLSX.utils.aoa_to_sheet([
+    ["LISTADO NOMINAL DE ALERTA TEMPRANA · " + N.anio + " · CONFIDENCIAL"],
+    ["Contiene datos personales de niñas, niños y adolescentes (Ley 1581 de 2012 y Ley 1098 de 2006). Uso exclusivo para acompañamiento y prevención del abandono escolar por parte de la Secretaría y de las instituciones educativas."],
+    ["No publicar, no compartir por canales abiertos y eliminar cuando termine el seguimiento. Entregue a cada institución solo sus propios estudiantes."],
+    ["El riesgo es una estimación estadística a partir de características registradas en el SIMAT (extraedad, repitencia, llegada reciente, origen, zona, modelo educativo, etc.); no es un diagnóstico. Verifique cada caso con docentes y orientación escolar."],
+    ["Niveles: Alto = riesgo estimado de " + fmt(N.umbrales[1] * 100, 0) + " % o más; Medio = entre " + fmt(N.umbrales[0] * 100, 0) + " % y " + fmt(N.umbrales[1] * 100, 0) + " %; «Retirado» = estudiante retirado en " + N.anio + " que no aparece matriculado (búsqueda activa)."]
+  ]);
+  XLSX.utils.book_append_sheet(wb, anchos(ins, [140]), "Leame");
+  var f = [["Municipio","Institución","Sede","Jornada","Grado","Grupo","Tipo de documento","Documento","Nombre","Nivel de alerta","Riesgo estimado (%)","Factores registrados"]];
+  N.filas.slice().sort(function(a, b){ return a.r.m.localeCompare(b.r.m, "es") || a.r.pn.inst.localeCompare(b.r.pn.inst, "es") || (b.p || 1) - (a.p || 1); }).forEach(function(x){
+    f.push([x.r.m, x.r.pn.inst, x.r.pn.sede, x.r.pn.jornada, x.r.g, x.r.pn.grupo, x.r.pn.tdoc, x.r.pn.doc, x.r.pn.nombre, x.nivel, x.p === null ? null : r1(x.p * 100), x.f.join("; ")]);
+  });
+  XLSX.utils.book_append_sheet(wb, anchos(XLSX.utils.aoa_to_sheet(f), [18,45,30,12,7,8,8,14,36,26,12,50]), "Alerta_estudiantes");
+  XLSX.writeFile(wb, "alerta_temprana_nominal_" + N.anio + "_CONFIDENCIAL.xlsx");
 }
 
 /* ---------- Informe ---------- */
@@ -1442,7 +1571,7 @@ function renderInforme(){
   h += textoInaccion(C);
 
   // 5. Abandono
-  if (S.abandono){ h += '<h2 class="salto">5. ¿Quiénes abandonan la escuela y en qué momento?</h2>' + htmlAbandono(S.abandono, "inf"); }
+  if (S.abandono){ h += '<h2 class="salto">5. ¿Quiénes abandonan la escuela y en qué momento?</h2>' + htmlAbandono(S.abandono, "inf") + htmlComparacion(S.abandono, "inf") + htmlAlerta(S.abandono, "inf", false); }
   // 6. Conclusiones
   h += '<h2>' + (S.abandono ? '6' : '5') + '. Conclusiones</h2><ul class="concl">' + conclusiones(C).map(function(t){ return '<li>' + t + '</li>'; }).join("") + '</ul>';
 
@@ -1470,7 +1599,7 @@ function renderInforme(){
   el.innerHTML = h;
   tablaResultados(C, "cruce", -1);
   dibujarGraficos(C);
-  if (S.abandono) dibujarAbandono(S.abandono, "inf");
+  if (S.abandono){ dibujarAbandono(S.abandono, "inf"); dibujarComparacion(S.abandono, "inf"); }
 }
 function kpi(v, l, r){ return '<div class="kpi"><div class="v">' + v + '</div><div class="l">' + l + '</div>' + (r ? '<div class="r">' + r + '</div>' : '') + '</div>'; }
 
@@ -1552,6 +1681,10 @@ function conclusiones(C){
   if (AB && AB.modelo){ var sigA = AB.modelo.coef.filter(function(k){ return k.p < 0.05 && k.or >= 1.3 && k.vk !== "anio" && !/sin dato/i.test(k.cat); }).sort(function(a, b){ return b.or - a.or; });
     var vistos = {}, nombres = []; sigA.forEach(function(k){ if (!vistos[k.vk]){ vistos[k.vk] = 1; nombres.push(k.vn.toLowerCase() + " (" + k.cat.charAt(0).toLowerCase() + k.cat.slice(1) + ")"); } });
     if (nombres.length) c.push("Con las demás características iguales, el abandono se asocia sobre todo con: " + lista(nombres.slice(0, 6)) + ". Prevenirlo exige actuar desde la primaria sobre la repitencia y la extraedad, acompañar la transición a la secundaria y a los estudiantes que llegan de otros lugares."); }
+  var LOE = AB ? oeMunicipios(AB) : [];
+  if (LOE.length){ var may = LOE.filter(function(x){ return x.clase === "mayor"; });
+    if (may.length) c.push("Al comparar municipios con el perfil de sus estudiantes, " + lista(may.slice(0, 5).map(function(x){ return x.m; })) + (may.length > 5 ? " y otros " + (may.length - 5) : "") + " tienen más abandono del esperado: allí el problema no se explica solo por la extraedad, la repitencia o la ruralidad, y conviene revisar la oferta, las transiciones y el acompañamiento institucional."); }
+  if (AB && AB.alerta){ var AT = AB.alerta; c.push("La alerta temprana identifica en " + AT.anio + " a " + fmt(AT.total.alto, 0) + " estudiantes en riesgo alto y " + fmt(AT.total.medio, 0) + " en riesgo medio, y a " + fmt(AT.total.retirados, 0) + " retirados para búsqueda activa; sin intervención, se esperarían cerca de " + fmt(AT.total.esp, 0) + " abandonos."); }
   if (d.sinMedia.length) c.push(lista(d.sinMedia) + (d.sinMedia.length > 1 ? " no cuentan" : " no cuenta") + " con matrícula en grado 11° dentro del municipio: la oferta de educación media es en sí misma una brecha territorial.");
   c.push("La inacción frente a la educación media se traduce en menor productividad, estancamiento del crecimiento y pérdida de bienestar social. La media debe asegurar competencias básicas —en particular para quienes llegan a ella sin tenerlas—, abrir espacios de exploración vocacional y ofrecer oportunidades para construir un proyecto de vida.");
   return c;

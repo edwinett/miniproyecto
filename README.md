@@ -31,7 +31,10 @@ Se calcula en la misma carga de los archivos del SIMAT (conviene cargar los 11 a
 - **Abandono anual (1° a 10°)**: el estudiante se retira o termina el año y no aparece matriculado al año siguiente en ninguna institución de los 46 municipios (seguimiento por `PER_ID`). Incluye traslados a Ibagué, a otros departamentos o al exterior.
 - **Trayectoria real de la cohorte**: cada niño de 1° en 2016 se sigue hasta 2026 (a tiempo, rezagado, en otros programas o fuera del sistema, y último grado cursado).
 - **Factores**: tasas de abandono por sexo, extraedad, nivel, repitencia o llegada nueva, zona, sector, modelo educativo, jornada, estrato, Sisbén IV, discapacidad (y tipo), trastornos del aprendizaje, etnia, país de origen y población campesina, más un **modelo de regresión logística** (2021–2025) que estima el riesgo ajustado (OR) de cada característica controlando las demás.
-- Son asociaciones, no causas; los campos «sin dato» reflejan en parte la falta de actualización del registro de quienes se van.
+- **Comparación ajustada entre municipios**: abandono observado frente al esperado según el perfil de sus estudiantes (razón O/E con IC 95 %) y prevalencia de extraedad, repitencia, llegada reciente, migración, ruralidad y modelos flexibles.
+- **Sistema de alerta temprana** (último año cargado): riesgo estimado de cada estudiante de 1° a 10° (alto ≥ 30 %, medio 15–30 %), agregado por institución y municipio, y retirados del año para búsqueda activa. Descarga de alertas por institución en Excel.
+- **Listado nominal (opcional, confidencial)**: si se marca la casilla antes de cargar los archivos, se genera en memoria el listado de estudiantes en alerta (nombre, documento, institución, sede, grado, grupo, nivel de riesgo y factores) para descargar en Excel. Nunca se guarda en la aplicación y desaparece al cerrar o recargar la página. Tratamiento conforme a la Ley 1581 de 2012.
+- Son asociaciones, no causas; los campos «sin dato» reflejan en parte la falta de actualización del registro de quienes se van. La capacidad del modelo para distinguir (AUC ≈ 0,71) es adecuada para priorizar, no para predecir casos individuales con exactitud.
 
 ## Indicadores
 
