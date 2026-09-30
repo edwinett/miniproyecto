@@ -11,7 +11,7 @@
   --bg:#f9f9f7; --surface:#fcfcfb; --surface2:#f3f2ee; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
   --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.12);
   --s1:#2a78d6; --accent:#1c5cab; --accent-ink:#ffffff;
-  --dot-integral:#184f95; --dot-llega:#86b6ef; --dot-no:#e1e0d9;
+  --dot-integral:#184f95; --dot-llega:#86b6ef; --dot-no:#e1e0d9; --dot-otro:#eda100; --s2:#eb6834;
   --good:#0ca30c; --good-text:#006300; --warn:#fab219; --warn-text:#8a5a00; --crit:#d03b3b;
   --ref1:#52514e; --ref2:#d03b3b;
   --banner-bg:#fff4d6; --banner-ink:#6b4a00;
@@ -22,7 +22,7 @@
     --bg:#0d0d0d; --surface:#1a1a19; --surface2:#232322; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
     --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.12);
     --s1:#3987e5; --accent:#3987e5; --accent-ink:#ffffff;
-    --dot-integral:#6da7ec; --dot-llega:#1c5cab; --dot-no:#383835;
+    --dot-integral:#6da7ec; --dot-llega:#1c5cab; --dot-no:#383835; --dot-otro:#c98500; --s2:#d95926;
     --good-text:#0ca30c; --warn-text:#fab219;
     --ref1:#c3c2b7; --ref2:#e66767;
     --banner-bg:#3a2f12; --banner-ink:#fbd78a;
@@ -33,7 +33,7 @@
   --bg:#0d0d0d; --surface:#1a1a19; --surface2:#232322; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
   --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.12);
   --s1:#3987e5; --accent:#3987e5; --accent-ink:#ffffff;
-  --dot-integral:#6da7ec; --dot-llega:#1c5cab; --dot-no:#383835;
+  --dot-integral:#6da7ec; --dot-llega:#1c5cab; --dot-no:#383835; --dot-otro:#c98500; --s2:#d95926;
   --good-text:#0ca30c; --warn-text:#fab219;
   --ref1:#c3c2b7; --ref2:#e66767;
   --banner-bg:#3a2f12; --banner-ink:#fbd78a;
@@ -109,6 +109,10 @@ th.ord{cursor:pointer;user-select:none}
 th.ord:after{content:" \2195";color:var(--muted);font-weight:400}
 td.heat{text-align:right;font-variant-numeric:tabular-nums}
 .refs p{font-size:.84rem;color:var(--ink2)}
+.puntos i.otr{background:var(--dot-otro)}
+.barrita{height:8px;background:var(--grid);border-radius:4px;overflow:hidden}
+.barrita i{display:block;height:100%;background:var(--s1);border-radius:4px}
+table.factores tr.grupo td{background:var(--surface2)}
 .zona{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:2px dashed var(--axis);border-radius:10px;padding:14px;margin-top:10px}
 .zona.encima{border-color:var(--accent);background:var(--surface2)}
 .filtros{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:.88rem}
@@ -123,7 +127,7 @@ td.heat{text-align:right;font-variant-numeric:tabular-nums}
 @media print{
   :root,:root[data-theme]{color-scheme:light;
     --bg:#fff; --surface:#fff; --surface2:#f3f2ee; --ink:#0b0b0b; --ink2:#52514e; --grid:#e1e0d9; --border:rgba(11,11,11,.12);
-    --s1:#2a78d6; --dot-integral:#184f95; --dot-llega:#86b6ef; --dot-no:#e1e0d9; --ref1:#52514e; --ref2:#d03b3b;
+    --s1:#2a78d6; --dot-integral:#184f95; --dot-llega:#86b6ef; --dot-no:#e1e0d9; --dot-otro:#eda100; --s2:#eb6834; --ref1:#52514e; --ref2:#d03b3b;
     --banner-bg:#fff4d6; --banner-ink:#6b4a00; --good-text:#006300; --warn-text:#8a5a00}
   header.app,nav.tabs,section.panel:not(#p-informe),.no-print{display:none!important}
   section#p-informe{display:block!important}
@@ -147,7 +151,8 @@ td.heat{text-align:right;font-variant-numeric:tabular-nums}
   <button role="tab" data-tab="p-captura" aria-selected="true">1. Matrícula año por año</button>
   <button role="tab" data-tab="p-saber" aria-selected="false">2. Saber 11 (2026)</button>
   <button role="tab" data-tab="p-datos" aria-selected="false">3. Datos y parámetros</button>
-  <button role="tab" data-tab="p-informe" aria-selected="false">4. Informe</button>
+  <button role="tab" data-tab="p-abandono" aria-selected="false">4. Abandono</button>
+  <button role="tab" data-tab="p-informe" aria-selected="false">5. Informe</button>
 </nav>
 <main>
 
@@ -228,6 +233,13 @@ td.heat{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 </section>
 
+<section class="panel" id="p-abandono">
+  <div class="card">
+    <h2>Abandono escolar y factores asociados</h2>
+    <div id="vistaAbandono"></div>
+  </div>
+</section>
+
 <section class="panel" id="p-informe">
   <div class="card no-print">
     <div class="fila">
@@ -243,6 +255,7 @@ td.heat{text-align:right;font-variant-numeric:tabular-nums}
 
 <script>/*__CHARTJS__*/</script>
 <script>/*__XLSX__*/</script>
+<script>/*__ABANDONO__*/</script>
 <script>
 "use strict";
 var MUNICIPIOS = ["Alpujarra","Alvarado","Ambalema","Anzoátegui","Armero Guayabal","Ataco","Cajamarca","Carmen de Apicalá","Casabianca","Chaparral","Coello","Coyaima","Cunday","Dolores","Espinal","Falan","Flandes","Fresno","Guamo","Herveo","Honda","Icononzo","Lérida","Líbano","Mariquita","Melgar","Murillo","Natagaima","Ortega","Palocabildo","Piedras","Planadas","Prado","Purificación","Rioblanco","Roncesvalles","Rovira","Saldaña","San Antonio","San Luis","Santa Isabel","Suárez","Valle de San Juan","Venadillo","Villahermosa","Villarrica"];
@@ -332,6 +345,12 @@ function calcular(){
     return {m:m, serie:serie, ret:ret, m1:m1, m11:m11, perm:perm, ev:ev, ig:ig, cal:cal, cruce:cruce, caida:caida,
       completos: serie.filter(function(v){ return v !== null; }).length};
   });
+  var AB = S.abandono;
+  filas.forEach(function(f){
+    f.ab = AB && AB.municipio[f.m] ? AB.municipio[f.m][1] / AB.municipio[f.m][0] * 100 : null;
+    var pc = AB && AB.cohorte && AB.cohorte.porMunicipio[f.m];
+    f.fuera = pc && pc[0] ? pc[1] / pc[0] * 100 : null;
+  });
   // Sin ningún resultado de calidad no hay cruce, ni siquiera en municipios con permanencia 0
   if (!filas.some(function(f){ return f.cal !== null; })) filas.forEach(function(f){ f.cruce = null; });
   // Cuartiles del cruce
@@ -384,6 +403,7 @@ tabs.forEach(function(b){
     if (b.dataset.tab === "p-saber"){ renderSaber(); renderInformeSaber(); }
     if (b.dataset.tab === "p-captura") renderCaptura();
     if (b.dataset.tab === "p-datos") renderSimat();
+    if (b.dataset.tab === "p-abandono") renderAbandonoTab();
     try{ sessionStorage.setItem(CLAVE+"-tab", b.dataset.tab); }catch(e){}
   });
 });
@@ -618,6 +638,27 @@ function exportarExcel(){
   ret.push(["Tolima (46 municipios)"].concat(C.dep.ret.map(r1)));
   XLSX.utils.book_append_sheet(wb, anchos(XLSX.utils.aoa_to_sheet(res),[24,16,16,14,16,24,20,18,12]), "Resultados");
   XLSX.utils.book_append_sheet(wb, anchos(XLSX.utils.aoa_to_sheet(ret),[24].concat(ANIOS.map(function(){ return 11; }))), "Retencion_%");
+  var AB = S.abandono;
+  if (AB){
+    var fa = [["Año","Estudiantes 1° a 11°","Retirados en el año","Retiro en el año (%)","Estudiantes 1° a 10° con año siguiente","Abandonan","Abandono (%)"]];
+    Object.keys(AB.anios).sort().forEach(function(a){ var t = AB.anios[a]; fa.push([+a, t.n, t.retiro, r1(t.retiro / t.n * 100), t.aband === null ? null : t.nAb, t.aband, t.aband === null ? null : r1(t.aband / t.nAb * 100)]); });
+    XLSX.utils.book_append_sheet(wb, anchos(XLSX.utils.aoa_to_sheet(fa),[8,20,18,18,30,12,14]), "Abandono_anual");
+    var coef = {}; if (AB.modelo) AB.modelo.coef.forEach(function(c){ coef[c.vk + "|" + c.cat] = c; });
+    var ff = [["Variable","Categoría","Estudiantes-año","Abandonan","Abandono (%)","OR ajustado","IC 95% inferior","IC 95% superior","p"]];
+    ABANDONO.VARIABLES.forEach(function(x){ x.orden.forEach(function(c){ var o = AB.vars[x.k][c]; if (!o) return; var k = coef[x.k + "|" + c];
+      ff.push([x.n, c, o[0], o[1], r1(o[1] / o[0] * 100), k ? Math.round(k.or * 100) / 100 : (c === x.ref && !x.fueraModelo ? 1 : null), k ? Math.round(k.lo * 100) / 100 : null, k ? Math.round(k.hi * 100) / 100 : null, k ? Number(k.p.toPrecision(2)) : null]); }); });
+    Object.keys(AB.vars.tipoDisc).forEach(function(c){ var o = AB.vars.tipoDisc[c]; ff.push(["Tipo de discapacidad", c, o[0], o[1], r1(o[1] / o[0] * 100), null, null, null, null]); });
+    Object.keys(AB.grado).sort(function(a,b){ return a-b; }).forEach(function(g){ var o = AB.grado[g]; ff.push(["Grado", g + "°", o[0], o[1], r1(o[1] / o[0] * 100), null, null, null, null]); });
+    XLSX.utils.book_append_sheet(wb, anchos(XLSX.utils.aoa_to_sheet(ff),[30,30,16,12,13,12,14,14,10]), "Abandono_factores");
+    if (AB.cohorte){ var CO = AB.cohorte, fc = [["Cohorte de 1° en " + CO.anio0 + " seguida por PER_ID hasta " + CO.anioFin], ["Situación","Estudiantes","%"],
+        ["En " + CO.gradoEsperado + "° a tiempo", CO.aTiempo, r1(CO.aTiempo / CO.n * 100)]];
+      Object.keys(CO.rezago).sort(function(a,b){ return a-b; }).forEach(function(g){ fc.push(["Rezagado en " + g + "°", CO.rezago[g], r1(CO.rezago[g] / CO.n * 100)]); });
+      fc.push(["Otros programas o grados", CO.otroGrado, r1(CO.otroGrado / CO.n * 100)], ["Graduados antes", CO.graduado, r1(CO.graduado / CO.n * 100)], ["Fuera del sistema de los 46 municipios", CO.fuera, r1(CO.fuera / CO.n * 100)], ["Total", CO.n, 100], [], ["Último grado cursado por quienes salieron","Estudiantes"]);
+      Object.keys(CO.salidaGrado).sort(function(a,b){ return a-b; }).forEach(function(g){ fc.push([+g ? g + "°" : "Adultos u otro", CO.salidaGrado[g]]); });
+      fc.push([], ["Municipio","Niños en 1°","Fuera del sistema","% fuera","A tiempo","% a tiempo"]);
+      MUNICIPIOS.forEach(function(m){ var o = CO.porMunicipio[m]; if (o) fc.push([m, o[0], o[1], r1(o[1] / o[0] * 100), o[2], r1(o[2] / o[0] * 100)]); });
+      XLSX.utils.book_append_sheet(wb, anchos(XLSX.utils.aoa_to_sheet(fc),[40,14,16,10,10,12]), "Cohorte_seguimiento"); }
+  }
   XLSX.utils.book_append_sheet(wb, anchos(hojaMatricula(true),[22].concat(ANIOS.map(function(){ return 16; }))), "Matricula");
   XLSX.utils.book_append_sheet(wb, anchos(hojaSaber(true),[22,22,40,26]), "Saber11");
   XLSX.writeFile(wb, "informe_cohorte_2016_2026_tolima.xlsx");
@@ -916,31 +957,80 @@ function renderSimat(){
   renderRevision();
 }
 function esperar(){ return new Promise(function(r){ setTimeout(r, 30); }); }
+function anioDeTexto(t){
+  var ls = t.slice(0, 20000).split("\n"); if (ls.length < 2) return null;
+  var cab = ls[0].replace(/^\uFEFF/, "").replace(/\r$/, "");
+  var sep = [";", "\t", "|", ","].sort(function(a,b){ return cab.split(b).length - cab.split(a).length; })[0];
+  var j = cab.split(sep).map(normalizar).findIndex(function(x){ return x === "ano" || x === "anio" || x === "vigencia"; });
+  if (j < 0) return null;
+  var y = parseInt(ls[1].split(sep)[j], 10);
+  return ANIOS.indexOf(y) >= 0 ? y : null;
+}
+function anioDeArchivo(f){
+  var r = String(f.name).match(/(?:^|[^0-9])(20(?:1[6-9]|2[0-6]))(?:[^0-9]|$)/), porNombre = r ? +r[1] : null;
+  if (/\.zip$/i.test(f.name)){
+    if (porNombre) return Promise.resolve(porNombre);
+    return leerBytesArchivo(f).then(function(b){ return anioDeTexto(textosDeArchivo(f.name, b)[0].texto); });
+  }
+  return new Promise(function(res){
+    var fr = new FileReader();
+    fr.onload = function(){ res(anioDeTexto(new TextDecoder("windows-1252").decode(new Uint8Array(fr.result))) || porNombre); };
+    fr.onerror = function(){ res(porNombre); };
+    fr.readAsArrayBuffer(f.slice(0, 65536));
+  });
+}
 function cargarSimat(files){
   var lista = Array.prototype.slice.call(files), prog = document.getElementById("progresoSimat"), msgs = [];
   if (!lista.length) return;
-  var i = 0;
-  (function siguiente(){
-    if (i >= lista.length){
-      S.ejemplo = false; aplicarSimat(); renderSimat();
-      prog.textContent = msgs.join(" ") + " " + prog.textContent;
-      return;
+  prog.textContent = "Identificando el año de cada archivo…";
+  var an = ABANDONO.nuevo(), P = null, A = null, cohorteRota = false;
+  var contar = function(e){ return filtroSimat().est.indexOf(e) >= 0; };
+  var resolver = function(sede, inst){ return (S.reasignar && S.reasignar[sede]) || municipioDeCodigo(sede) || municipioDeCodigo(inst); };
+  function avanzar(N){
+    if (A) ABANDONO.procesar(an, A, P && P.anio === A.anio - 1 ? P : null, N && N.anio === A.anio + 1 ? N : null, 2021);
+    if (N){
+      if (!an.cohorte && N.anio === 2016) ABANDONO.cohorteInicio(an, N, contar);
+      if (an.cohorte && !cohorteRota){ if (!an.cohorte.ultimo || N.anio === an.cohorte.ultimo + 1) ABANDONO.cohorteAnio(an, N); else cohorteRota = true; }
     }
-    var f = lista[i++];
-    prog.textContent = "Leyendo " + f.name + " (" + i + " de " + lista.length + ")…";
-    esperar().then(function(){ return leerBytesArchivo(f); }).then(function(bytes){
-      prog.textContent = "Procesando " + f.name + " (" + i + " de " + lista.length + ")…";
-      return esperar().then(function(){
-        textosDeArchivo(f.name, bytes).forEach(function(t){
-          var d = procesarSimat(t.nombre, t.texto);
-          Object.keys(d.info).forEach(function(sc){ S.sedeInfo[sc] = d.info[sc]; });
-          delete d.info;
-          if (S.simat[d.anio] && S.simat[d.anio].archivo !== d.archivo) msgs.push("El año " + d.anio + " se reemplazó con " + d.archivo + ".");
-          S.simat[d.anio] = d;
+    P = A; A = N;
+  }
+  Promise.all(lista.map(function(f){ return anioDeArchivo(f).catch(function(){ return null; }); })).then(function(anios){
+    var orden = lista.map(function(f, i){ return {f:f, a:anios[i]}; }).sort(function(x, y){ return (x.a || 9999) - (y.a || 9999); });
+    var i = 0;
+    (function siguiente(){
+      if (i >= orden.length){
+        prog.textContent = "Calculando el análisis de abandono…";
+        esperar().then(function(){
+          avanzar(null);
+          var pares = Object.keys(an.anios).filter(function(a){ return an.anios[a].aband !== null; });
+          if (pares.length){
+            S.abandono = ABANDONO.resumen(an);
+            S.abandono.aniosCargados = Object.keys(an.anios).map(Number);
+          } else if (orden.length) msgs.push("Para el análisis de abandono cargue juntos al menos dos años consecutivos (idealmente 2016 a 2026).");
+          an = null; P = null; A = null;
+          S.ejemplo = false; aplicarSimat(); renderSimat();
+          prog.textContent = msgs.join(" ") + " " + prog.textContent;
         });
-      });
-    }).catch(function(e){ msgs.push("⚠ " + f.name + ": " + e.message + "."); }).then(siguiente);
-  })();
+        return;
+      }
+      var o = orden[i++], f = o.f;
+      prog.textContent = "Leyendo " + f.name + (o.a ? " (" + o.a + ")" : "") + " · " + i + " de " + orden.length + "…";
+      esperar().then(function(){ return leerBytesArchivo(f); }).then(function(bytes){
+        prog.textContent = "Procesando " + f.name + (o.a ? " (" + o.a + ")" : "") + " · " + i + " de " + orden.length + "…";
+        return esperar().then(function(){
+          textosDeArchivo(f.name, bytes).forEach(function(t){
+            var d = procesarSimat(t.nombre, t.texto);
+            Object.keys(d.info).forEach(function(sc){ S.sedeInfo[sc] = d.info[sc]; });
+            delete d.info;
+            if (S.simat[d.anio] && S.simat[d.anio].archivo !== d.archivo) msgs.push("El año " + d.anio + " se reemplazó con " + d.archivo + ".");
+            S.simat[d.anio] = d;
+            var R = ABANDONO.leerAnio(t.texto, d.anio, resolver);
+            if (R){ if (A && R.anio <= A.anio) msgs.push("El archivo de " + R.anio + " no está en orden cronológico; el análisis de abandono puede quedar incompleto."); else avanzar(R); }
+          });
+        });
+      }).catch(function(e){ msgs.push("⚠ " + f.name + ": " + e.message + "."); }).then(siguiente);
+    })();
+  });
 }
 document.getElementById("archivosSimat").addEventListener("change", function(ev){ cargarSimat(ev.target.files); ev.target.value = ""; });
 (function(){
@@ -1157,6 +1247,99 @@ document.getElementById("btnQuitarSaberInf").addEventListener("click", function(
   guardar(); renderInformeSaber(); renderSaber();
 });
 
+/* ---------- Abandono y factores asociados (vista y sección del informe) ---------- */
+function tasa(x){ return x && x[0] ? x[1] / x[0] * 100 : null; }
+function htmlAbandono(R, pre){
+  if (!R) return '<div class="vacio">Aún no hay análisis de abandono. En «3. Datos y parámetros» cargue juntos los archivos del SIMAT de todos los años (2016 a 2026): el análisis se calcula en la misma carga.</div>';
+  var h = "", anios = Object.keys(R.anios).sort(), pares = anios.filter(function(a){ return R.anios[a].aband !== null; });
+  var ult = pares[pares.length-1], tU = R.anios[ult];
+  var totN = 0, totA = 0; pares.forEach(function(a){ totN += R.anios[a].nAb; totA += R.anios[a].aband; });
+  var C = R.cohorte;
+  h += '<p>Se siguió a cada estudiante con su identificador del SIMAT (PER_ID) de un año al siguiente. Se considera que un estudiante de 1° a 10° <b>abandona</b> en un año cuando se retira o termina el año y no aparece matriculado al año siguiente en ninguna institución de los 46 municipios. Además, se siguió uno por uno a los niños que cursaban grado 1° en ' + (C ? C.anio0 : 2016) + '.</p>';
+  if (C){
+    var pa = C.aTiempo / C.n * 100, pr = Object.keys(C.rezago).reduce(function(s, g){ return s + C.rezago[g]; }, 0) / C.n * 100, po = (C.otroGrado + C.graduado) / C.n * 100, pf = C.fuera / C.n * 100;
+    var nA = Math.round(pa), nR = Math.round(pr), nO = Math.round(po), nF = 100 - nA - nR - nO, dots = "";
+    for (var i = 0; i < 100; i++) dots += '<i class="' + (i < nA ? "int" : i < nA + nR ? "lle" : i < nA + nR + nO ? "otr" : "") + '"></i>';
+    h += '<h3>La trayectoria real de los niños de 1° en ' + C.anio0 + '</h3>';
+    h += '<p class="destacado">De cada 100 niños que cursaban grado 1° en ' + C.anio0 + ', en ' + C.anioFin + ' ' + nA + ' están en grado ' + C.gradoEsperado + '° (a tiempo), ' + nR + ' siguen estudiando en un grado inferior y ' + Math.round(pf) + ' ya no están matriculados en las instituciones de los 46 municipios.</p>';
+    h += '<div class="puntos-wrap"><div class="puntos" role="img" aria-label="Trayectoria de 100 niños">' + dots + '</div><div class="leyenda">' +
+      '<span><i style="background:var(--dot-integral)"></i>' + fmt(pa) + ' % en ' + C.gradoEsperado + '° a tiempo (' + fmt(C.aTiempo,0) + ')</span>' +
+      '<span><i style="background:var(--dot-llega)"></i>' + fmt(pr) + ' % rezagados en un grado inferior</span>' +
+      '<span><i style="background:var(--dot-otro)"></i>' + fmt(po) + ' % en otros programas (ciclos de adultos) o graduados</span>' +
+      '<span><i style="background:var(--dot-no)"></i>' + fmt(pf) + ' % fuera del sistema de los 46 municipios (' + fmt(C.fuera,0) + ')</span></div></div>';
+    h += '<p>' + fmt(C.repitieron / C.n * 100, 0) + ' de cada 100 repitieron al menos un grado y ' + fmt(C.volvieron / C.n * 100, 0) + ' de cada 100 salieron del sistema y volvieron después. El cálculo agregado de la sección 2 compara totales de matrícula, que incluyen repitentes y estudiantes llegados de otros lugares; por eso es mayor que la proporción de niños de la cohorte original que llega a tiempo.</p>';
+    h += '<div class="grafico" style="height:260px"><canvas id="' + pre + '-salida"></canvas></div><div class="fuente">Gráfico. Último grado cursado por los niños de la cohorte ' + C.anio0 + ' que ya no están matriculados en ' + C.anioFin + ' (número de estudiantes).</div>';
+  }
+  h += '<h3>Abandono año por año</h3>';
+  h += '<div class="kpis">' + kpi(pct(totA / totN * 100), "abandono anual promedio de 1° a 10° (" + pares[0] + "–" + ult + ")", fmt(totA,0) + " salidas en " + fmt(totN,0) + " estudiantes-año") +
+    kpi(pct(tU.aband / tU.nAb * 100), "abandono en " + ult, "retiro durante el año: " + pct(tU.retiro / tU.n * 100)) + '</div>';
+  h += '<div class="grafico" style="height:260px"><canvas id="' + pre + '-tend"></canvas></div><div class="fuente">Gráfico. Porcentaje de estudiantes de 1° a 10° que abandonan (no continúan al año siguiente) y de estudiantes de 1° a 11° retirados durante el año.</div>';
+  h += '<div class="grafico" style="height:240px"><canvas id="' + pre + '-grado"></canvas></div><div class="fuente">Gráfico. Abandono anual por grado, promedio ' + pares[0] + '–' + ult + '.</div>';
+  // Factores
+  var M = R.modelo, coef = {};
+  if (M) M.coef.forEach(function(c){ coef[c.vk + "|" + c.cat] = c; });
+  h += '<h3>¿Quiénes abandonan? Factores asociados</h3>';
+  h += '<p>' + textoFactores(R) + '</p>';
+  h += '<div class="tabla-wrap"><table class="factores"><thead><tr><th>Variable y categoría</th><th class="num">Estudiantes-año</th><th class="num">Abandono</th><th></th><th class="num">Riesgo ajustado (OR)</th><th class="num">IC 95 %</th></tr></thead><tbody>';
+  var maxT = 0; ABANDONO.VARIABLES.forEach(function(x){ x.orden.forEach(function(c){ var t = tasa(R.vars[x.k][c]); if (t > maxT) maxT = t; }); });
+  ABANDONO.VARIABLES.forEach(function(x){
+    var o = R.vars[x.k], cats = x.orden.filter(function(c){ return o[c] && o[c][0] >= 30; });
+    if (!cats.length) return;
+    h += '<tr class="grupo"><td colspan="6"><b>' + esc(x.n) + '</b>' + (x.fueraModelo ? ' <span class="nota">(no incluida en el modelo: dato incompleto)</span>' : '') + '</td></tr>';
+    cats.forEach(function(c){
+      var t = tasa(o[c]), k = coef[x.k + "|" + c], orTxt = "—", ic = "", marca = "";
+      if (c === x.ref && M && !x.fueraModelo) orTxt = "1 (referencia)";
+      if (k){ orTxt = fmt(k.or, 2); ic = fmt(k.lo, 2) + "–" + fmt(k.hi, 2); if (k.p < 0.05 && k.or >= 1.3) marca = ' <span class="etq alerta">▲ mayor riesgo</span>'; else if (k.p < 0.05 && k.or <= 0.77) marca = ' <span class="etq ok">▼ menor riesgo</span>'; else if (k.p >= 0.05) marca = ' <span class="nota">no significativo</span>'; }
+      h += '<tr><td style="padding-left:18px">' + esc(c) + '</td><td class="num">' + fmt(o[c][0], 0) + '</td><td class="num">' + pct(t) + '</td><td style="min-width:120px"><div class="barrita"><i style="width:' + (t / maxT * 100) + '%"></i></div></td><td class="num">' + orTxt + marca + '</td><td class="num nota">' + ic + '</td></tr>';
+    });
+  });
+  h += '</tbody></table></div>';
+  if (M) h += '<p class="fuente">OR: razón de odds del modelo de regresión logística que incluye a la vez todas las variables de la tabla (salvo población campesina) y el año, estimado con ' + fmt(M.n, 0) + ' estudiantes-año de ' + M.anios[0] + ' a ' + M.anios[M.anios.length-1] + '. Un OR de 2 indica que, con las demás características iguales, las probabilidades de abandonar son el doble que en la categoría de referencia. IC 95 %: intervalo de confianza.</p>';
+  var td = R.vars.tipoDisc, tipos = Object.keys(td).filter(function(k){ return td[k][0] >= 30; }).sort(function(a, b){ return tasa(td[b]) - tasa(td[a]); });
+  if (tipos.length) h += '<p class="nota">Abandono según tipo de discapacidad: ' + tipos.map(function(k){ return esc(k) + " " + pct(tasa(td[k])) + " (" + fmt(td[k][0], 0) + ")"; }).join("; ") + '.</p>';
+  h += '<p class="nota"><b>Cautelas.</b> (1) Son asociaciones, no causas: el SIMAT no registra el motivo real del retiro (en la mayoría figura «no continuó en el establecimiento»). (2) «Abandono» incluye a quienes se trasladan a Ibagué, a otro departamento o al exterior, que no aparecen en estos archivos; esto pesa más en población migrante. (3) Los datos personales del SIMAT (Sisbén, país de origen, población campesina) se actualizan para quienes siguen estudiando, por lo que «sin dato» se asocia artificialmente con el abandono. (4) Las categorías con menos de 30 estudiantes-año no se muestran.</p>';
+  return h;
+}
+function textoFactores(R){
+  var M = R.modelo; if (!M) return "Se requieren al menos tres años consecutivos (desde 2021) para estimar el modelo ajustado.";
+  var sig = M.coef.filter(function(c){ return c.p < 0.05 && c.vk !== "anio" && !/sin dato/i.test(c.cat); });
+  var alto = sig.filter(function(c){ return c.or >= 1.3; }).sort(function(a, b){ return b.or - a.or; }).slice(0, 7);
+  var bajo = sig.filter(function(c){ return c.or <= 0.77; }).sort(function(a, b){ return a.or - b.or; }).slice(0, 4);
+  function d(c){ var t = /^(Venezuela|Otro país|Pijao|Nasa|Afro|Privado|Rural|Hombre|Media|Secundaria)/.test(c.cat) ? c.cat : c.cat.charAt(0).toLowerCase() + c.cat.slice(1); return t + " (" + c.vn.toLowerCase() + ", OR " + fmt(c.or, 1) + ")"; }
+  var s = "Al considerar todas las características al mismo tiempo, los factores más asociados con el abandono son: " + lista(alto.map(d)) + ". ";
+  if (bajo.length) s += "Se asocian con menor abandono: " + lista(bajo.map(d)) + ". ";
+  s += "La extraedad —consecuencia de la repitencia y del ingreso tardío— es el predictor más fuerte, lo que señala que el abandono se gesta años antes, en la primaria.";
+  return s;
+}
+function dibujarAbandono(R, pre){
+  if (!R) return;
+  var o = baseOpts(), eje = {grid:{color:o.grid}, border:{color:o.grid}, ticks:{color:o.ink2}};
+  var anios = Object.keys(R.anios).sort();
+  var c1 = document.getElementById(pre + "-tend");
+  if (c1) graficos.push(new Chart(c1, {type:"line", data:{labels:anios, datasets:[
+      {label:"Abandono (no continúa al año siguiente)", data:anios.map(function(a){ var t = R.anios[a]; return t.aband === null ? null : t.aband / t.nAb * 100; }), borderColor:o.s1, backgroundColor:o.s1, borderWidth:2, pointRadius:4, pointBorderColor:o.surface, pointBorderWidth:2},
+      {label:"Retiro durante el año", data:anios.map(function(a){ var t = R.anios[a]; return t.retiro / t.n * 100; }), borderColor:o.s2, backgroundColor:o.s2, borderWidth:2, pointRadius:4, pointBorderColor:o.surface, pointBorderWidth:2}]},
+    options:{responsive:true, maintainAspectRatio:false, animation:false, interaction:{mode:"index", intersect:false},
+      plugins:{legend:{position:"bottom", labels:{color:o.ink2, usePointStyle:true}}, tooltip:{callbacks:{label:function(x){ return " " + x.dataset.label + ": " + pct(x.parsed.y); }}}},
+      scales:{x:eje, y:Object.assign({}, eje, {min:0, ticks:{color:o.ink2, callback:function(v){ return v + " %"; }}})}}}));
+  var c2 = document.getElementById(pre + "-grado");
+  if (c2){ var gs = Object.keys(R.grado).map(Number).sort(function(a,b){ return a-b; });
+    graficos.push(new Chart(c2, {type:"bar", data:{labels:gs.map(function(g){ return g + "°"; }), datasets:[{data:gs.map(function(g){ return tasa(R.grado[g]); }), backgroundColor:o.s1, borderRadius:{topLeft:4, topRight:4}, borderSkipped:"start", barPercentage:.7}]},
+      options:{responsive:true, maintainAspectRatio:false, animation:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:function(x){ return " Abandono: " + pct(x.parsed.y) + " · " + fmt(R.grado[gs[x.dataIndex]][0], 0) + " estudiantes-año"; }}}},
+        scales:{x:Object.assign({}, eje, {grid:{display:false}}), y:Object.assign({}, eje, {min:0, ticks:{color:o.ink2, callback:function(v){ return v + " %"; }}})}}})); }
+  var c3 = document.getElementById(pre + "-salida"), C = R.cohorte;
+  if (c3 && C){ var ks = Object.keys(C.salidaGrado).map(Number).sort(function(a,b){ return a-b; });
+    graficos.push(new Chart(c3, {type:"bar", data:{labels:ks.map(function(g){ return g ? g + "°" : "Adultos u otro"; }), datasets:[{data:ks.map(function(g){ return C.salidaGrado[g]; }), backgroundColor:o.s1, borderRadius:{topLeft:4, topRight:4}, borderSkipped:"start", barPercentage:.7}]},
+      options:{responsive:true, maintainAspectRatio:false, animation:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:function(x){ return " " + fmt(x.parsed.y, 0) + " estudiantes (" + pct(x.parsed.y / C.fuera * 100) + " de los que salieron)"; }}}},
+        scales:{x:Object.assign({}, eje, {grid:{display:false}, title:{display:true, text:"Último grado cursado", color:o.ink2}}), y:Object.assign({}, eje, {min:0})}}})); }
+}
+function renderAbandonoTab(){
+  destruir();
+  var el = document.getElementById("vistaAbandono");
+  el.innerHTML = htmlAbandono(S.abandono, "ab");
+  dibujarAbandono(S.abandono, "ab");
+}
+
 /* ---------- Informe ---------- */
 var graficos = [];
 function destruir(){ graficos.forEach(function(g){ g.destroy(); }); graficos = []; }
@@ -1164,7 +1347,8 @@ function baseOpts(){
   var ink2 = cssVar("--ink2"), grid = cssVar("--grid");
   Chart.defaults.font.family = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
   Chart.defaults.color = ink2;
-  return {grid: grid, ink2: ink2, s1: cssVar("--s1"), surface: cssVar("--surface"), ref1: cssVar("--ref1"), ref2: cssVar("--ref2")};
+  Chart.defaults.locale = "es-CO";
+  return {grid: grid, ink2: ink2, s1: cssVar("--s1"), s2: cssVar("--s2"), surface: cssVar("--surface"), ref1: cssVar("--ref1"), ref2: cssVar("--ref2")};
 }
 var pluginReferencias = {
   id: "referencias",
@@ -1257,8 +1441,10 @@ function renderInforme(){
   h += '<h2>4. ¿Qué implica la inacción frente a la educación media?</h2>';
   h += textoInaccion(C);
 
-  // 5. Conclusiones
-  h += '<h2>5. Conclusiones</h2><ul class="concl">' + conclusiones(C).map(function(t){ return '<li>' + t + '</li>'; }).join("") + '</ul>';
+  // 5. Abandono
+  if (S.abandono){ h += '<h2 class="salto">5. ¿Quiénes abandonan la escuela y en qué momento?</h2>' + htmlAbandono(S.abandono, "inf"); }
+  // 6. Conclusiones
+  h += '<h2>' + (S.abandono ? '6' : '5') + '. Conclusiones</h2><ul class="concl">' + conclusiones(C).map(function(t){ return '<li>' + t + '</li>'; }).join("") + '</ul>';
 
   // Apéndices
   h += '<h2 class="salto">Apéndice A. Resultados por municipio</h2>';
@@ -1284,6 +1470,7 @@ function renderInforme(){
   el.innerHTML = h;
   tablaResultados(C, "cruce", -1);
   dibujarGraficos(C);
+  if (S.abandono) dibujarAbandono(S.abandono, "inf");
 }
 function kpi(v, l, r){ return '<div class="kpi"><div class="v">' + v + '</div><div class="l">' + l + '</div>' + (r ? '<div class="r">' + r + '</div>' : '') + '</div>'; }
 
@@ -1359,6 +1546,12 @@ function conclusiones(C){
     c.push("Las brechas entre municipios son amplias: " + f[0].m + " registra " + fmt(f[0].cruce) + " de cada 100 y " + f[f.length-1].m + " " + fmt(f[f.length-1].cruce) + ". " +
       f.filter(function(x){ return x.cuartil === 1; }).length + " municipios están en el cuartil más bajo y requieren atención prioritaria: " + lista(f.filter(function(x){ return x.cuartil === 1; }).map(function(x){ return x.m; })) + ".");
   }
+  var AB = S.abandono;
+  if (AB && AB.cohorte){ var CO = AB.cohorte, sg = CO.salidaGrado, s59 = [5,6,7,8,9].reduce(function(s, g){ return s + (sg[g] || 0); }, 0);
+    c.push("Siguiendo a cada estudiante, solo " + fmt(CO.aTiempo / CO.n * 100, 0) + " de cada 100 niños que cursaban 1° en " + CO.anio0 + " están en " + CO.gradoEsperado + "° en " + CO.anioFin + " a tiempo, y " + fmt(CO.fuera / CO.n * 100, 0) + " de cada 100 ya no están matriculados en los 46 municipios. El " + fmt(s59 / CO.fuera * 100, 0) + " % de quienes salieron lo hizo después de cursar entre 5° y 9°."); }
+  if (AB && AB.modelo){ var sigA = AB.modelo.coef.filter(function(k){ return k.p < 0.05 && k.or >= 1.3 && k.vk !== "anio" && !/sin dato/i.test(k.cat); }).sort(function(a, b){ return b.or - a.or; });
+    var vistos = {}, nombres = []; sigA.forEach(function(k){ if (!vistos[k.vk]){ vistos[k.vk] = 1; nombres.push(k.vn.toLowerCase() + " (" + k.cat.charAt(0).toLowerCase() + k.cat.slice(1) + ")"); } });
+    if (nombres.length) c.push("Con las demás características iguales, el abandono se asocia sobre todo con: " + lista(nombres.slice(0, 6)) + ". Prevenirlo exige actuar desde la primaria sobre la repitencia y la extraedad, acompañar la transición a la secundaria y a los estudiantes que llegan de otros lugares."); }
   if (d.sinMedia.length) c.push(lista(d.sinMedia) + (d.sinMedia.length > 1 ? " no cuentan" : " no cuenta") + " con matrícula en grado 11° dentro del municipio: la oferta de educación media es en sí misma una brecha territorial.");
   c.push("La inacción frente a la educación media se traduce en menor productividad, estancamiento del crecimiento y pérdida de bienestar social. La media debe asegurar competencias básicas —en particular para quienes llegan a ella sin tenerlas—, abrir espacios de exploración vocacional y ofrecer oportunidades para construir un proyecto de vida.");
   return c;
@@ -1374,6 +1567,7 @@ function tablaRetencion(C){
 }
 function tablaResultados(C, campo, dir){
   var cols = [["m","Municipio"],["m1","Matrícula 1° 2016"],["m11","Matrícula 11° 2026"],["perm","Permanencia %"],["cal","Calidad %"],["cruce","Cruce %"],["cuartil","Cuartil"]];
+  if (S.abandono) cols.push(["ab","Abandono anual %"], ["fuera","Cohorte fuera del sistema %"]);
   var f = C.filas.slice().sort(function(a,b){
     var x = a[campo], y = b[campo];
     if (x === null && y === null) return 0; if (x === null) return 1; if (y === null) return -1;
@@ -1381,10 +1575,10 @@ function tablaResultados(C, campo, dir){
   });
   var h = '<thead><tr>' + cols.map(function(c){ return '<th class="ord' + (c[0] === "m" || c[0] === "cuartil" ? '' : ' num') + '" data-c="' + c[0] + '">' + c[1] + '</th>'; }).join("") + '</tr></thead><tbody>';
   f.forEach(function(x){
-    h += '<tr><td>' + esc(x.m) + '</td><td class="num">' + fmt(x.m1,0) + '</td><td class="num">' + fmt(x.m11,0) + '</td><td class="num">' + fmt(x.perm) + '</td><td class="num">' + fmt(x.cal) + '</td><td class="num"><b>' + fmt(x.cruce) + '</b></td><td>' + (x.cuartil ? NOMBRE_CUARTIL[x.cuartil] : "—") + '</td></tr>';
+    h += '<tr><td>' + esc(x.m) + '</td><td class="num">' + fmt(x.m1,0) + '</td><td class="num">' + fmt(x.m11,0) + '</td><td class="num">' + fmt(x.perm) + '</td><td class="num">' + fmt(x.cal) + '</td><td class="num"><b>' + fmt(x.cruce) + '</b></td><td>' + (x.cuartil ? NOMBRE_CUARTIL[x.cuartil] : "—") + '</td>' + (S.abandono ? '<td class="num">' + fmt(x.ab) + '</td><td class="num">' + fmt(x.fuera) + '</td>' : '') + '</tr>';
   });
   var d = C.dep;
-  h += '<tr><td><b>Tolima (46 municipios)</b></td><td class="num"><b>' + fmt(d.m1,0) + '</b></td><td class="num"><b>' + fmt(d.m11,0) + '</b></td><td class="num"><b>' + fmt(d.perm) + '</b></td><td class="num"><b>' + fmt(d.cal) + '</b></td><td class="num"><b>' + fmt(d.cruce) + '</b></td><td>—</td></tr>';
+  h += '<tr><td><b>Tolima (46 municipios)</b></td><td class="num"><b>' + fmt(d.m1,0) + '</b></td><td class="num"><b>' + fmt(d.m11,0) + '</b></td><td class="num"><b>' + fmt(d.perm) + '</b></td><td class="num"><b>' + fmt(d.cal) + '</b></td><td class="num"><b>' + fmt(d.cruce) + '</b></td><td>—</td>' + (S.abandono ? '<td></td><td></td>' : '') + '</tr>';
   var t = document.getElementById("tablaResultados");
   t.innerHTML = h + '</tbody>';
   t.querySelectorAll("th.ord").forEach(function(th){

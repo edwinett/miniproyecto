@@ -28,6 +28,8 @@ const chart = sanear(fs.readFileSync(path.join(nm, "chart.js/dist/chart.umd.js")
 const xlsx = sanear(fs.readFileSync(path.join(nm, "xlsx/dist/xlsx.full.min.js"), "utf8"));
 let html = fs.readFileSync(path.join(__dirname, "src/app.html"), "utf8");
 if (!html.includes("/*__CHARTJS__*/") || !html.includes("/*__XLSX__*/")) throw new Error("Faltan marcadores en src/app.html");
-html = html.split("/*__CHARTJS__*/").join(chart).split("/*__XLSX__*/").join(xlsx);
+const abandono = fs.readFileSync(path.join(__dirname, "src/abandono.js"), "utf8").replace(/<\/script/gi, "<\\/script");
+if (!html.includes("/*__ABANDONO__*/")) throw new Error("Falta el marcador de abandono en src/app.html");
+html = html.split("/*__CHARTJS__*/").join(chart).split("/*__XLSX__*/").join(xlsx).split("/*__ABANDONO__*/").join(abandono);
 fs.writeFileSync(path.join(__dirname, "index.html"), html);
 console.log("index.html generado:", (html.length / 1024).toFixed(0), "KB");
