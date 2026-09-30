@@ -109,6 +109,12 @@ th.ord{cursor:pointer;user-select:none}
 th.ord:after{content:" \2195";color:var(--muted);font-weight:400}
 td.heat{text-align:right;font-variant-numeric:tabular-nums}
 .refs p{font-size:.84rem;color:var(--ink2)}
+.zona{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:2px dashed var(--axis);border-radius:10px;padding:14px;margin-top:10px}
+.zona.encima{border-color:var(--accent);background:var(--surface2)}
+.filtros{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:.88rem}
+.filtros fieldset{border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin:0}
+.filtros legend{font-size:.82rem;color:var(--ink2);padding:0 4px}
+.filtros label{display:inline-flex;align-items:center;gap:5px;margin-right:12px;white-space:nowrap}
 @media (max-width:600px){
   main{padding:12px}
   input.cel{width:88px}
@@ -171,6 +177,19 @@ td.heat{text-align:right;font-variant-numeric:tabular-nums}
 
 <section class="panel" id="p-datos">
   <div class="card">
+    <h2>Cargar archivos del SIMAT (uno por año)</h2>
+    <p class="nota">Seleccione o arrastre a la vez los archivos de matrícula de cada año, de 2016 a 2026, en formato .txt o .zip, tal como los descarga del SIMAT. El año se toma de la columna ANO. Cada estudiante se cuenta una sola vez (PER_ID) en el municipio de su sede (código DANE de la sede) y en su grado; para cada año se usa el grado de la cohorte.</p>
+    <p class="nota"><b>Privacidad:</b> estos archivos tienen datos personales de estudiantes. La aplicación los lee en este equipo, solo cuenta estudiantes por municipio, grado, estado y sector, y no guarda nombres, documentos ni ningún otro dato personal. Nada se envía a internet.</p>
+    <div id="zonaSimat" class="zona">
+      <label class="btn primario">Seleccionar archivos SIMAT<input type="file" id="archivosSimat" accept=".txt,.csv,.zip" multiple hidden></label>
+      <span class="nota">o arrástrelos aquí</span>
+    </div>
+    <p class="nota" id="progresoSimat" role="status"></p>
+    <div id="filtrosSimat"></div>
+    <div class="tabla-wrap" id="wrapSimat" style="display:none;margin-top:10px"><table id="tablaSimat"></table></div>
+    <div id="revisionSedes"></div>
+  </div>
+  <div class="card">
     <h2>Importar y exportar</h2>
     <p class="nota">Descargue la plantilla de Excel, llénela con los datos del SIMAT/MEN y del ICFES, y cárguela aquí. Los datos quedan guardados en este navegador; haga copias de respaldo con regularidad.</p>
     <div class="fila" style="margin-top:10px">
@@ -218,6 +237,8 @@ td.heat{text-align:right;font-variant-numeric:tabular-nums}
 "use strict";
 var MUNICIPIOS = ["Alpujarra","Alvarado","Ambalema","Anzoátegui","Armero Guayabal","Ataco","Cajamarca","Carmen de Apicalá","Casabianca","Chaparral","Coello","Coyaima","Cunday","Dolores","Espinal","Falan","Flandes","Fresno","Guamo","Herveo","Honda","Icononzo","Lérida","Líbano","Mariquita","Melgar","Murillo","Natagaima","Ortega","Palocabildo","Piedras","Planadas","Prado","Purificación","Rioblanco","Roncesvalles","Rovira","Saldaña","San Antonio","San Luis","Santa Isabel","Suárez","Valle de San Juan","Venadillo","Villahermosa","Villarrica"];
 var ALIAS = {"armero":"Armero Guayabal","guayabal":"Armero Guayabal","sansebastiandemariquita":"Mariquita","elespinal":"Espinal","carmendeapicala":"Carmen de Apicalá","elcarmendeapicala":"Carmen de Apicalá","valledesanjuan":"Valle de San Juan","sanluis":"San Luis","libano":"Líbano","ellibano":"Líbano","falan":"Falan","villarica":"Villarrica","elguamo":"Guamo"};
+/* Códigos DANE de los 46 municipios (sin Ibagué, 73001) */
+var COD_MUN = {"73024":"Alpujarra","73026":"Alvarado","73030":"Ambalema","73043":"Anzoátegui","73055":"Armero Guayabal","73067":"Ataco","73124":"Cajamarca","73148":"Carmen de Apicalá","73152":"Casabianca","73168":"Chaparral","73200":"Coello","73217":"Coyaima","73226":"Cunday","73236":"Dolores","73268":"Espinal","73270":"Falan","73275":"Flandes","73283":"Fresno","73319":"Guamo","73347":"Herveo","73349":"Honda","73352":"Icononzo","73408":"Lérida","73411":"Líbano","73443":"Mariquita","73449":"Melgar","73461":"Murillo","73483":"Natagaima","73504":"Ortega","73520":"Palocabildo","73547":"Piedras","73555":"Planadas","73563":"Prado","73585":"Purificación","73616":"Rioblanco","73622":"Roncesvalles","73624":"Rovira","73671":"Saldaña","73675":"San Antonio","73678":"San Luis","73686":"Santa Isabel","73770":"Suárez","73854":"Valle de San Juan","73861":"Venadillo","73870":"Villahermosa","73873":"Villarrica"};
 var ANIOS = [2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026];
 function grado(a){ return a - 2015; }
 /* Referencias del informe ORE-Icesi (enero 2026), cohorte 2024 */
@@ -241,7 +262,8 @@ function buscarMunicipio(t){
 }
 
 function vacio(){
-  return {version:1, matricula:{}, saber:{}, ejemplo:false,
+  return {version:1, matricula:{}, saber:{}, ejemplo:false, simat:{}, reasignar:{}, sedeInfo:{},
+    simatFiltro:{estados:["MATRICULADO","GRADUADO","REPROBADO"], sectores:null},
     params:{titulo:"Las implicaciones de la inacción en la educación media en el Tolima",
       entidad:"", autor:"", salario:1423500, retornoMedia:16.5}};
 }
@@ -250,7 +272,13 @@ function cargar(){
   return vacio();
 }
 var S = cargar();
-function guardar(){ try{ localStorage.setItem(CLAVE, JSON.stringify(S)); }catch(e){} }
+var avisoGuardado = false;
+function guardar(){
+  try{ localStorage.setItem(CLAVE, JSON.stringify(S)); }
+  catch(e){
+    if (!avisoGuardado){ avisoGuardado = true; alert("El navegador no permitió guardar los datos (espacio insuficiente o modo privado). La aplicación sigue funcionando en esta sesión; use «Guardar respaldo (.json)» para no perder el trabajo."); }
+  }
+}
 
 function num(v){
   if (v === null || v === undefined || v === "") return null;
@@ -283,7 +311,7 @@ function calcular(){
     var sb = S.saber[m] || {};
     var ev = entero(sb.evaluados), ig = entero(sb.integral), p = num(sb.pct), cal = null;
     if (ev > 0 && ig !== null) cal = ig / ev * 100; else if (p !== null) cal = p;
-    var cruce = (perm !== null && cal !== null) ? perm * cal / 100 : null;
+    var cruce = perm === 0 ? 0 : (perm !== null && cal !== null) ? perm * cal / 100 : null;
     var caida = null;
     for (var i = 1; i < serie.length; i++){
       if (serie[i-1] > 0 && serie[i] !== null){
@@ -323,6 +351,7 @@ function calcular(){
   else if (sEv) dep.cal = sIg / sEv * 100;
   else if (sw) dep.cal = sp / sw;
   else dep.cal = null;
+  dep.sinMedia = filas.filter(function(f){ return f.m1 > 0 && f.m11 === 0; }).map(function(f){ return f.m; });
   dep.cruce = (dep.perm !== null && dep.cal !== null) ? dep.perm * dep.cal / 100 : null;
   dep.m1Total = filas.reduce(function(s,f){ return s + (f.m1||0); }, 0);
   var conCruce = filas.filter(function(f){ return f.cruce !== null; });
@@ -342,6 +371,7 @@ tabs.forEach(function(b){
     if (b.dataset.tab === "p-informe") renderInforme();
     if (b.dataset.tab === "p-saber") renderSaber();
     if (b.dataset.tab === "p-captura") renderCaptura();
+    if (b.dataset.tab === "p-datos") renderSimat();
     try{ sessionStorage.setItem(CLAVE+"-tab", b.dataset.tab); }catch(e){}
   });
 });
@@ -355,7 +385,7 @@ function renderAnios(){
   var h = "";
   ANIOS.forEach(function(a){
     var n = contarAnio(a);
-    h += '<button type="button" data-anio="'+a+'" aria-pressed="'+(a===anioSel)+'"><b>'+a+'</b><span>Grado '+grado(a)+'° · '+n+'/46</span><div class="barra"><i style="width:'+(n/46*100)+'%"></i></div></button>';
+    h += '<button type="button" data-anio="'+a+'" aria-pressed="'+(a===anioSel)+'"><b>'+a+'</b><span>Grado '+grado(a)+'° · '+n+'/46'+(S.simat && S.simat[a] ? ' · SIMAT' : '')+'</span><div class="barra"><i style="width:'+(n/46*100)+'%"></i></div></button>';
   });
   var cont = document.getElementById("anios");
   cont.innerHTML = h;
@@ -379,7 +409,7 @@ function renderCaptura(){
   renderAnios();
   var a = anioSel;
   document.getElementById("tituloAnio").textContent = "Año " + a + " · matrícula en grado " + grado(a) + "°";
-  document.getElementById("avanceAnio").textContent = contarAnio(a) + " de 46 municipios con dato";
+  document.getElementById("avanceAnio").textContent = contarAnio(a) + " de 46 municipios con dato" + (S.simat && S.simat[a] ? " · cargado desde SIMAT (" + S.simat[a].archivo + "); si cambia los filtros de estado o sector, estos valores se recalculan" : "");
   var h = '<thead><tr><th>#</th><th>Municipio</th><th class="num">Matrícula grado '+grado(a)+'° ('+a+')</th>' +
     (a > 2016 ? '<th class="num">Grado '+grado(a-1)+'° ('+(a-1)+')</th><th class="num">Variación anual</th>' : '') +
     '<th class="num">% frente a 1° (2016)</th><th>Estado</th></tr></thead><tbody>';
@@ -411,7 +441,7 @@ function actualizarFila(i){
   tr.querySelector(".c-est").innerHTML = c.estado;
   document.getElementById("avanceAnio").textContent = contarAnio(anioSel) + " de 46 municipios con dato";
   var b = document.querySelector('#anios button[data-anio="'+anioSel+'"]'), n = contarAnio(anioSel);
-  b.querySelector("span").textContent = "Grado " + grado(anioSel) + "° · " + n + "/46";
+  b.querySelector("span").textContent = "Grado " + grado(anioSel) + "° · " + n + "/46" + (S.simat && S.simat[anioSel] ? " · SIMAT" : "");
   b.querySelector(".barra i").style.width = (n/46*100) + "%";
 }
 function pegarColumna(ev, desde, fijar, rehacer){
@@ -610,7 +640,7 @@ document.getElementById("btnEjemplo").addEventListener("click", function(){
 function datosEjemplo(){
   var semilla = 20162026;
   function azar(){ semilla = (semilla * 1103515245 + 12345) % 2147483648; return semilla / 2147483648; }
-  S.matricula = {}; S.saber = {}; S.ejemplo = true;
+  S.matricula = {}; S.saber = {}; S.simat = {}; S.ejemplo = true;
   MUNICIPIOS.forEach(function(m){
     var base = Math.round(60 + azar() * 700), v = base, o = {};
     var fuerza = .55 + azar() * .4;
@@ -626,6 +656,284 @@ function datosEjemplo(){
     S.saber[m] = {evaluados: ev, integral: Math.round(ev * (.02 + azar() * .2 * fuerza))};
   });
 }
+
+/* ---------- Archivos SIMAT (.txt / .zip, uno por año) ---------- */
+var PRIORIDAD_ESTADO = {"MATRICULADO":3, "GRADUADO":3, "REPROBADO":3, "RETIRADO":1};
+var ESTADOS_DEFECTO = ["MATRICULADO","GRADUADO","REPROBADO"];
+function columna(enc, nombres){
+  for (var i = 0; i < nombres.length; i++){ var j = enc.indexOf(normalizar(nombres[i])); if (j >= 0) return j; }
+  return -1;
+}
+function municipioDeCodigo(cod){
+  var t = String(cod || "").replace(/\D/g, ""), m = null;
+  if (t.length >= 12) m = COD_MUN[t.substr(1,5)];
+  else if (t.length >= 5) m = COD_MUN[t.substr(0,5)];
+  return m || null;
+}
+function leerBytesArchivo(f){
+  return new Promise(function(res, rej){ var r = new FileReader(); r.onload = function(){ res(new Uint8Array(r.result)); }; r.onerror = function(){ rej(r.error); }; r.readAsArrayBuffer(f); });
+}
+function textosDeArchivo(nombre, bytes){
+  // Devuelve [{nombre, texto}] (un .zip puede traer varios .txt)
+  var dec = new TextDecoder(esUtf8(bytes) ? "utf-8" : "windows-1252");
+  if (bytes[0] === 0x50 && bytes[1] === 0x4b){
+    var z = XLSX.CFB.read(bytes, {type:"array"}), out = [];
+    z.FileIndex.forEach(function(e){
+      if (e.type === 2 && /\.(txt|csv)$/i.test(e.name) && e.content && e.content.length){
+        var c = e.content instanceof Uint8Array ? e.content : Uint8Array.from(e.content);
+        out.push({nombre: nombre + " › " + e.name, texto: new TextDecoder(esUtf8(c) ? "utf-8" : "windows-1252").decode(c)});
+      }
+    });
+    if (!out.length) throw new Error("el .zip no contiene archivos .txt");
+    return out;
+  }
+  return [{nombre: nombre, texto: dec.decode(bytes)}];
+}
+function esUtf8(b){
+  try{ new TextDecoder("utf-8", {fatal:true}).decode(b.subarray(0, Math.min(b.length, 2000000))); return true; }catch(e){ return false; }
+}
+function procesarSimat(nombre, texto){
+  var fin = texto.indexOf("\n"); if (fin < 0) throw new Error("archivo vacío o sin saltos de línea");
+  var cab = texto.slice(0, fin).replace(/^\uFEFF/, "").replace(/\r$/, "");
+  var sep = [";", "\t", "|", ","].sort(function(a,b){ return cab.split(b).length - cab.split(a).length; })[0];
+  var enc = cab.split(sep).map(normalizar);
+  var cA = columna(enc, ["ANO","AÑO","ANIO","VIGENCIA"]), cE = columna(enc, ["ESTADO","ESTADO_MATRICULA"]),
+      cG = columna(enc, ["GRADO_COD","GRADO","COD_GRADO","CODIGO_GRADO"]), cSe = columna(enc, ["CODIGO_DANE_SEDE","DANE_SEDE","COD_DANE_SEDE"]),
+      cI = columna(enc, ["DANE","CODIGO_DANE","DANE_ESTABLECIMIENTO","CODIGO_DANE_ESTABLECIMIENTO"]), cM = columna(enc, ["MUNICIPIO","NOMBRE_MUNICIPIO","MUNICIPIO_SEDE"]),
+      cS = columna(enc, ["SECTOR"]), cP = columna(enc, ["PER_ID","ID_PERSONA","PERSONA_ID"]),
+      cNs = columna(enc, ["SEDE","NOMBRE_SEDE"]), cNi = columna(enc, ["INSTITUCION","NOMBRE_INSTITUCION","ESTABLECIMIENTO"]), cZ = columna(enc, ["ZONA_SEDE","ZONA"]);
+  if (cG < 0) throw new Error("no se encontró la columna de grado (GRADO_COD)");
+  if (cSe < 0 && cI < 0 && cM < 0) throw new Error("no se encontró la columna CODIGO_DANE_SEDE ni DANE");
+  var porId = new Map(), anios = {}, filas = 0, fuera = 0, reasig = 0, codFuera = {}, info = {};
+  var pos = fin + 1, n = texto.length;
+  while (pos < n){
+    var e = texto.indexOf("\n", pos); if (e < 0) e = n;
+    var l = texto.slice(pos, e); pos = e + 1;
+    if (l.charCodeAt(l.length-1) === 13) l = l.slice(0, -1);
+    if (!l) continue;
+    var c = l.split(sep); filas++;
+    if (cA >= 0 && c[cA]) anios[c[cA]] = (anios[c[cA]] || 0) + 1;
+    var g = parseInt(c[cG], 10);
+    var est = cE >= 0 ? String(c[cE]).trim().toUpperCase() : "MATRICULADO";
+    var sec = cS >= 0 ? String(c[cS]).trim().toUpperCase() || "SIN DATO" : "SIN DATO";
+    var m = cSe >= 0 ? municipioDeCodigo(c[cSe]) : null;
+    if (!m && cI >= 0){ m = municipioDeCodigo(c[cI]); if (m && cSe >= 0 && c[cSe]) reasig++; }
+    if (!m && cM >= 0) m = buscarMunicipio(c[cM]);
+    if (!m){ fuera++; var k = cSe >= 0 && c[cSe] ? String(c[cSe]).substr(1,5) : (cI >= 0 && c[cI] ? String(c[cI]).substr(1,5) : "sin código"); codFuera[k] = (codFuera[k] || 0) + 1; continue; }
+    var sc = (cSe >= 0 && c[cSe]) ? String(c[cSe]).trim() : "M:" + m;
+    if (!info[sc]) info[sc] = {m:m, n: cNs >= 0 ? String(c[cNs]).trim() : "", i: cNi >= 0 ? String(c[cNi]).trim() : "", ci: cI >= 0 ? String(c[cI]).trim() : "", z: cZ >= 0 ? String(c[cZ]).trim().toUpperCase() : "", t:0};
+    info[sc].t++;
+    var reg = {sc:sc, g:(g >= 1 && g <= 11) ? g : 0, e:est, s:sec, p:PRIORIDAD_ESTADO[est] || 0};
+    var id = cP >= 0 ? String(c[cP]).trim() : "";
+    if (!id) id = "#" + filas;
+    var prev = porId.get(id);
+    if (!prev || reg.p >= prev.p) porId.set(id, reg);
+  }
+  var anio = null, max = 0;
+  Object.keys(anios).forEach(function(a){ if (anios[a] > max){ max = anios[a]; anio = parseInt(a, 10); } });
+  if (!anio){ var r = String(nombre).match(/20(1[6-9]|2[0-6])/); if (r) anio = +r[0]; }
+  if (ANIOS.indexOf(anio) < 0) throw new Error("no se pudo determinar el año (columna ANO) o está fuera de 2016–2026");
+  // Solo se guardan conteos del grado de la cohorte, por sede (sin datos personales)
+  var gc = grado(anio), sedes = {}, estados = {}, sectores = {};
+  porId.forEach(function(r){
+    estados[r.e] = (estados[r.e] || 0) + 1; sectores[r.s] = (sectores[r.s] || 0) + 1;
+    if (r.g !== gc) return;
+    var s = sedes[r.sc] = sedes[r.sc] || {}, k = r.e + "|" + r.s;
+    s[k] = (s[k] || 0) + 1;
+  });
+  // Sedes sin estudiantes del grado: se registran vacías para conocer los municipios presentes y poder reasignarlas
+  Object.keys(info).forEach(function(sc){ if (!sedes[sc]) sedes[sc] = 0; delete info[sc].t; });
+  return {anio:anio, archivo:nombre, filas:filas, estudiantes:porId.size, fuera:fuera, reasignados:reasig,
+    codFuera:codFuera, estados:estados, sectores:sectores, sedes:sedes, info:info, cargado:new Date().toISOString()};
+}
+function filtroSimat(){
+  var f = S.simatFiltro || {};
+  return {est: f.estados || ESTADOS_DEFECTO, sec: f.sectores};
+}
+function municipioSede(sc){ return (S.reasignar && S.reasignar[sc]) || (S.sedeInfo[sc] || {}).m; }
+function cuentaSede(c, F){
+  var t = 0;
+  if (!c) return 0;
+  Object.keys(c).forEach(function(k){ var p = k.split("|"); if (F.est.indexOf(p[0]) >= 0 && (!F.sec || F.sec.indexOf(p[1]) >= 0)) t += c[k]; });
+  return t;
+}
+function porMunicipioSimat(d){
+  var F = filtroSimat(), out = {};
+  Object.keys(d.sedes).forEach(function(sc){ var m = municipioSede(sc); if (m) out[m] = (out[m] || 0) + cuentaSede(d.sedes[sc], F); });
+  return out;
+}
+function aplicarSimat(){
+  Object.keys(S.simat || {}).forEach(function(a){
+    var pm = porMunicipioSimat(S.simat[a]);
+    MUNICIPIOS.forEach(function(m){
+      S.matricula[m] = S.matricula[m] || {};
+      if (pm[m] === undefined) delete S.matricula[m][a]; else S.matricula[m][a] = pm[m];
+    });
+  });
+  guardar();
+}
+function totalSimat(d){ var pm = porMunicipioSimat(d); return Object.keys(pm).reduce(function(s, m){ return s + pm[m]; }, 0); }
+function normEsp(t){ return " " + String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim() + " "; }
+var NOMBRES_BUSQUEDA = MUNICIPIOS.map(function(m){
+  var n = normEsp(m);
+  if (m === "Armero Guayabal") n = " ARMERO ";
+  if (m === "Carmen de Apicalá") n = " APICALA ";
+  return [m, n];
+});
+function todasLasSedes(){
+  var u = {};
+  Object.keys(S.simat || {}).sort().forEach(function(a){
+    var d = S.simat[a], F = filtroSimat();
+    Object.keys(d.sedes).forEach(function(sc){
+      var s = S.sedeInfo[sc] || {m:null, n:"", i:"", ci:"", z:""}, x = u[sc] = u[sc] || {sc:sc, m:s.m, n:s.n, i:s.i, ci:s.ci, z:s.z, anios:{}};
+      x.anios[a] = cuentaSede(d.sedes[sc], F);
+    });
+  });
+  return Object.keys(u).map(function(k){ return u[k]; });
+}
+function sedesSospechosas(lista){
+  // Sedes urbanas cuyo nombre es exactamente el de otro municipio (por ejemplo, una sede llamada «PALOCABILDO» con código de Falan)
+  var out = [];
+  lista.forEach(function(s){
+    if (s.z.indexOf("URB") !== 0) return;
+    var nom = normEsp(s.n);
+    NOMBRES_BUSQUEDA.concat([["Armero Guayabal", normEsp("Armero Guayabal")],["Carmen de Apicalá", normEsp("Carmen de Apicalá")],["Mariquita", normEsp("San Sebastián de Mariquita")]]).forEach(function(x){
+      if (x[0] !== s.m && nom === x[1] && !out.some(function(o){ return o.s === s; })) out.push({s:s, sug:x[0]});
+    });
+  });
+  return out;
+}
+function opcionesMunicipio(sel){
+  return MUNICIPIOS.map(function(m){ return '<option' + (m === sel ? " selected" : "") + '>' + esc(m) + '</option>'; }).join("");
+}
+function filaSede(s){
+  var asig = municipioSede(s.sc), anios = Object.keys(s.anios).sort();
+  var tot = anios.map(function(a){ return a + ": " + fmt(s.anios[a], 0); }).join(" · ");
+  return '<tr><td>' + esc(s.sc.replace(/^M:/, "")) + '</td><td style="white-space:normal">' + esc(s.n) + '<br><span class="nota">' + esc(s.i) + ' · ' + esc(s.z) + '</span></td><td>' + esc(s.m) + '</td>' +
+    '<td><select class="txt" data-sede="' + esc(s.sc) + '" style="width:auto">' + opcionesMunicipio(asig) + '</select>' + (asig !== s.m ? ' <span class="etq alerta">reasignada</span>' : '') + '</td>' +
+    '<td class="nota" style="white-space:normal">' + tot + '</td></tr>';
+}
+function renderRevision(){
+  var cont = document.getElementById("revisionSedes"); if (!cont) return;
+  var lista = todasLasSedes();
+  if (!lista.length){ cont.innerHTML = ""; return; }
+  var sosp = sedesSospechosas(lista), q = normEsp(document.getElementById("buscaSede") ? document.getElementById("buscaSede").value : "").trim();
+  var reas = lista.filter(function(s){ return municipioSede(s.sc) !== s.m; });
+  var h = '<h3 style="margin:14px 0 6px">Revisar el municipio de las sedes</h3><p class="nota">Cada sede se ubica en el municipio de su código DANE. Si una sede está codificada con el municipio equivocado, cámbiela aquí; la corrección se aplica a todos los años cargados. Los valores de la última columna son los estudiantes del grado de la cohorte en cada año.</p>';
+  if (sosp.length){
+    h += '<p class="nota"><b>Posibles inconsistencias</b>: sedes urbanas cuyo nombre corresponde a otro municipio.</p><div class="tabla-wrap"><table><thead><tr><th>Código sede</th><th>Sede · institución</th><th>Municipio del código</th><th>Asignar a</th><th>Estudiantes en grado de la cohorte</th></tr></thead><tbody>' +
+      sosp.map(function(x){ return filaSede(x.s).replace('<select', '<span class="etq alerta">¿' + esc(x.sug) + '?</span> <select'); }).join("") + '</tbody></table></div>';
+  }
+  if (reas.length) h += '<p class="nota" style="margin-top:8px">Sedes reasignadas: ' + reas.length + '. <button class="btn" id="btnDeshacerReas">Deshacer todas las reasignaciones</button></p>';
+  h += '<div class="fila" style="margin-top:10px"><input class="txt" id="buscaSede" placeholder="Buscar sede o institución por nombre o código (por ejemplo LEOPOLDO)" style="max-width:520px" value="' + esc(q === "" ? "" : document.getElementById("buscaSede").value) + '"></div>';
+  if (q){
+    var res = lista.filter(function(s){ return normEsp(s.n + " " + s.i + " " + s.sc + " " + s.ci + " " + s.m).indexOf(q) >= 0; }).slice(0, 60);
+    h += '<div class="tabla-wrap" style="margin-top:8px"><table><thead><tr><th>Código sede</th><th>Sede · institución</th><th>Municipio del código</th><th>Asignar a</th><th>Estudiantes en grado de la cohorte</th></tr></thead><tbody>' +
+      (res.map(filaSede).join("") || '<tr><td colspan="5" class="nota">Sin resultados</td></tr>') + '</tbody></table></div>';
+  }
+  cont.innerHTML = h;
+  var bs = document.getElementById("buscaSede");
+  bs.addEventListener("input", function(){ var pos = bs.selectionStart; renderRevision(); var n = document.getElementById("buscaSede"); n.focus(); n.setSelectionRange(pos, pos); });
+  cont.querySelectorAll("select[data-sede]").forEach(function(se){
+    se.addEventListener("change", function(){
+      var sc = se.dataset.sede, orig = lista.filter(function(s){ return s.sc === sc; })[0].m;
+      S.reasignar = S.reasignar || {};
+      if (se.value === orig) delete S.reasignar[sc]; else S.reasignar[sc] = se.value;
+      aplicarSimat(); renderSimat();
+    });
+  });
+  var bd = document.getElementById("btnDeshacerReas");
+  if (bd) bd.addEventListener("click", function(){ S.reasignar = {}; aplicarSimat(); renderSimat(); });
+}
+function renderSimat(){
+  var anios = Object.keys(S.simat || {}).sort();
+  var wrap = document.getElementById("wrapSimat"), fil = document.getElementById("filtrosSimat");
+  if (!anios.length){ wrap.style.display = "none"; fil.innerHTML = ""; renderRevision(); return; }
+  var est = {}, sec = {};
+  anios.forEach(function(a){ var d = S.simat[a];
+    Object.keys(d.estados).forEach(function(k){ est[k] = (est[k] || 0) + d.estados[k]; });
+    Object.keys(d.sectores).forEach(function(k){ sec[k] = (sec[k] || 0) + d.sectores[k]; }); });
+  var F = filtroSimat();
+  var h = '<div class="filtros"><fieldset><legend>Estados que cuentan como matrícula</legend>' +
+    Object.keys(est).sort(function(a,b){ return est[b] - est[a]; }).map(function(k){
+      return '<label><input type="checkbox" data-est="' + esc(k) + '"' + (F.est.indexOf(k) >= 0 ? " checked" : "") + '>' + esc(k) + ' <span class="nota">(' + fmt(est[k],0) + ')</span></label>'; }).join("") +
+    '</fieldset><fieldset><legend>Sector</legend>' +
+    Object.keys(sec).sort().map(function(k){
+      return '<label><input type="checkbox" data-sec="' + esc(k) + '"' + (!F.sec || F.sec.indexOf(k) >= 0 ? " checked" : "") + '>' + esc(k) + ' <span class="nota">(' + fmt(sec[k],0) + ')</span></label>'; }).join("") +
+    '</fieldset></div><p class="nota">Por defecto se cuentan MATRICULADO, GRADUADO y REPROBADO: los estudiantes que están en el grado en el año (en los archivos de cierre de año, quienes terminaron el grado quedan como graduados o reprobados). Los RETIRADOS salieron durante el año. Al cambiar estas opciones se recalcula la matrícula de los años cargados desde SIMAT. Los conteos por estado y sector incluyen todos los grados.</p>';
+  fil.innerHTML = h;
+  fil.querySelectorAll("input[type=checkbox]").forEach(function(ch){
+    ch.addEventListener("change", function(){
+      var e = [], s = [], todos = true;
+      fil.querySelectorAll("input[data-est]").forEach(function(x){ if (x.checked) e.push(x.dataset.est); });
+      fil.querySelectorAll("input[data-sec]").forEach(function(x){ if (x.checked) s.push(x.dataset.sec); else todos = false; });
+      S.simatFiltro = {estados:e, sectores: todos ? null : s};
+      aplicarSimat(); renderSimat();
+    });
+  });
+  var t = '<thead><tr><th>Año</th><th>Grado cohorte</th><th>Archivo</th><th class="num">Filas</th><th class="num">Estudiantes únicos</th><th class="num">Matrícula cohorte</th><th class="num">Municipios</th><th>Observaciones</th><th></th></tr></thead><tbody>';
+  anios.forEach(function(a){
+    var d = S.simat[a], obs = [], pm = porMunicipioSimat(d);
+    var aus = MUNICIPIOS.filter(function(m){ return pm[m] === undefined; });
+    var sinG = MUNICIPIOS.filter(function(m){ return pm[m] === 0; });
+    if (aus.length) obs.push("Sin registros: " + aus.join(", "));
+    if (sinG.length) obs.push("Sin estudiantes en " + grado(+a) + "°: " + sinG.join(", "));
+    if (d.fuera) obs.push(fmt(d.fuera,0) + " filas fuera de los 46 municipios o sin código (" + Object.keys(d.codFuera).map(function(k){ return k + ": " + d.codFuera[k]; }).join(", ") + ")");
+    if (d.reasignados) obs.push(fmt(d.reasignados,0) + " filas de sedes con código de otro municipio (fuera de los 46) asignadas al municipio de su institución");
+    var rep = d.filas - d.fuera - d.estudiantes;
+    if (rep > 0) obs.push(fmt(rep,0) + " filas repetidas del mismo estudiante (se cuenta una vez)");
+    t += '<tr><td><b>' + a + '</b></td><td>' + grado(+a) + '°</td><td>' + esc(d.archivo) + '</td><td class="num">' + fmt(d.filas,0) + '</td><td class="num">' + fmt(d.estudiantes,0) +
+      '</td><td class="num"><b>' + fmt(totalSimat(d),0) + '</b></td><td class="num">' + (46 - aus.length) + '/46</td><td style="white-space:normal;min-width:260px" class="nota">' + (obs.map(esc).join("<br>") || "—") +
+      '</td><td><button class="btn" data-quitar="' + a + '" title="Quitar este año">Quitar</button></td></tr>';
+  });
+  var falt = ANIOS.filter(function(a){ return !S.simat[a]; });
+  var tb = document.getElementById("tablaSimat");
+  tb.innerHTML = t + '</tbody>';
+  wrap.style.display = "";
+  tb.querySelectorAll("button[data-quitar]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var a = b.dataset.quitar; delete S.simat[a];
+      MUNICIPIOS.forEach(function(m){ if (S.matricula[m]) delete S.matricula[m][a]; });
+      guardar(); renderSimat();
+    });
+  });
+  document.getElementById("progresoSimat").textContent = "Años cargados desde SIMAT: " + anios.join(", ") + "." + (falt.length ? " Faltan: " + falt.join(", ") + "." : " La cohorte está completa.");
+  renderRevision();
+}
+function esperar(){ return new Promise(function(r){ setTimeout(r, 30); }); }
+function cargarSimat(files){
+  var lista = Array.prototype.slice.call(files), prog = document.getElementById("progresoSimat"), msgs = [];
+  if (!lista.length) return;
+  var i = 0;
+  (function siguiente(){
+    if (i >= lista.length){
+      S.ejemplo = false; aplicarSimat(); renderSimat();
+      prog.textContent = msgs.join(" ") + " " + prog.textContent;
+      return;
+    }
+    var f = lista[i++];
+    prog.textContent = "Leyendo " + f.name + " (" + i + " de " + lista.length + ")…";
+    esperar().then(function(){ return leerBytesArchivo(f); }).then(function(bytes){
+      prog.textContent = "Procesando " + f.name + " (" + i + " de " + lista.length + ")…";
+      return esperar().then(function(){
+        textosDeArchivo(f.name, bytes).forEach(function(t){
+          var d = procesarSimat(t.nombre, t.texto);
+          Object.keys(d.info).forEach(function(sc){ S.sedeInfo[sc] = d.info[sc]; });
+          delete d.info;
+          if (S.simat[d.anio] && S.simat[d.anio].archivo !== d.archivo) msgs.push("El año " + d.anio + " se reemplazó con " + d.archivo + ".");
+          S.simat[d.anio] = d;
+        });
+      });
+    }).catch(function(e){ msgs.push("⚠ " + f.name + ": " + e.message + "."); }).then(siguiente);
+  })();
+}
+document.getElementById("archivosSimat").addEventListener("change", function(ev){ cargarSimat(ev.target.files); ev.target.value = ""; });
+(function(){
+  var z = document.getElementById("zonaSimat");
+  ["dragenter","dragover"].forEach(function(t){ z.addEventListener(t, function(e){ e.preventDefault(); z.classList.add("encima"); }); });
+  ["dragleave","drop"].forEach(function(t){ z.addEventListener(t, function(e){ e.preventDefault(); z.classList.remove("encima"); }); });
+  z.addEventListener("drop", function(e){ cargarSimat(e.dataTransfer.files); });
+})();
 
 /* ---------- Informe ---------- */
 var graficos = [];
@@ -670,6 +978,8 @@ function renderInforme(){
     (P.entidad ? ' · ' + esc(P.entidad) : '') + (P.autor ? ' · ' + esc(P.autor) : '') + ' · Generado el ' + hoy + '</p>';
 
   if (!C.conM1){
+    var hay = ANIOS.filter(function(a){ return contarAnio(a) > 0; });
+    if (hay.length){ el.innerHTML = h + '<div class="vacio">Falta la matrícula de <b>2016 (grado 1°)</b>, que es la base de la cohorte. Hay datos de: ' + hay.join(", ") + '. Cargue el archivo SIMAT de 2016 para generar el informe.</div>'; return; }
     el.innerHTML = h + '<div class="vacio">Aún no hay datos. Registre la matrícula de 2016 (grado 1°) y de los años siguientes en la pestaña «Matrícula año por año», importe la plantilla de Excel o cargue los datos de ejemplo en «Datos y parámetros».</div>';
     return;
   }
@@ -735,6 +1045,8 @@ function renderInforme(){
   h += '<div class="tabla-wrap">' + tablaRetencion(C) + '</div>';
   h += '<p class="fuente">Valores mayores a 100 % pueden deberse a migración de estudiantes hacia el municipio, a repitencia acumulada o a ajustes en el registro de matrícula.</p>';
   h += '<h2>Nota metodológica</h2>';
+  var aS = Object.keys(S.simat || {}).sort();
+  if (aS.length){ var FS = filtroSimat(); h += '<p>Fuente de la matrícula: archivos del SIMAT para ' + aS.join(", ") + '. Cada estudiante se cuenta una vez (PER_ID) en el municipio del código DANE de su sede y en su grado. Estados incluidos: ' + FS.est.join(", ") + '. Sectores: ' + (FS.sec ? FS.sec.join(", ") : "todos") + '.' + (Object.keys(S.reasignar || {}).length ? ' Se reasignaron manualmente ' + Object.keys(S.reasignar).length + ' sedes cuyo código DANE no correspondía a su municipio: ' + Object.keys(S.reasignar).map(function(k){ return k + " → " + esc(S.reasignar[k]); }).join("; ") + '.' : '') + '</p>'; }
   h += '<p>Permanencia: matrícula total en grado 11° en 2026 dividida por la matrícula total en grado 1° en 2016. Es una aproximación por cohorte, no un seguimiento por estudiante, y supone que las entradas y salidas por repitencia y migración se compensan. Calidad: porcentaje de evaluados en Saber 11 que alcanzan niveles de desempeño 3 o 4 simultáneamente en matemáticas, lectura crítica, ciencias naturales y sociales y ciudadanas. Cruce: permanencia × calidad / 100, es decir, el porcentaje estimado de estudiantes que ingresaron a 1° y llegan a 11° con desempeño integral. No todos los estudiantes de 11° presentan la prueba y no se conoce el logro de quienes abandonaron, por lo que la proporción real puede ser menor. El agregado departamental suma la matrícula de los municipios con dato en 2016 y en cada año; la calidad departamental pondera por número de evaluados.</p>';
   h += '<div class="refs"><h3>Referencias</h3>' +
     '<p>Ruiz Patiño, J., Navia Jaramillo, S., Bernal, G. y Maldonado, D. (2026). Las implicaciones de la inacción en la educación media en Colombia. Observatorio de Realidades Educativas – Universidad Icesi.</p>' +
@@ -779,7 +1091,8 @@ function textoBrechas(C){
   var top = f.slice(0,3).map(function(x){ return x.m + " (" + fmt(x[campo]) + ")"; });
   var bot = f.slice(-3).reverse().map(function(x){ return x.m + " (" + fmt(x[campo]) + ")"; });
   var max = f[0][campo], min = f[f.length-1][campo];
-  var s = "Mientras en " + lista(top) + " la mayor proporción de estudiantes que ingresaron a 1° en 2016 " + etiqueta + " (por cada 100), en " + lista(bot) + " esta proporción es la más baja del departamento. ";
+  var sm = C.dep.sinMedia.length ? lista(C.dep.sinMedia) + (C.dep.sinMedia.length > 1 ? " no registran" : " no registra") + " matrícula en grado 11° en 2026: sus jóvenes deben trasladarse a otro municipio para cursar la media, por lo que su permanencia aparece en cero aunque parte de ellos continúe estudiando en otro lugar. " : "";
+  var s = sm + "Mientras en " + lista(top) + " la mayor proporción de estudiantes que ingresaron a 1° en 2016 " + etiqueta + " (por cada 100), en " + lista(bot) + " esta proporción es la más baja del departamento. ";
   if (min > 0) s += "La brecha entre el municipio con mejor y peor resultado es de " + fmt(max / min) + " veces. ";
   else s += "Al menos un municipio no registra estudiantes en esta condición. ";
   if (campo === "cruce"){
@@ -818,6 +1131,7 @@ function conclusiones(C){
     c.push("Las brechas entre municipios son amplias: " + f[0].m + " registra " + fmt(f[0].cruce) + " de cada 100 y " + f[f.length-1].m + " " + fmt(f[f.length-1].cruce) + ". " +
       f.filter(function(x){ return x.cuartil === 1; }).length + " municipios están en el cuartil más bajo y requieren atención prioritaria: " + lista(f.filter(function(x){ return x.cuartil === 1; }).map(function(x){ return x.m; })) + ".");
   }
+  if (d.sinMedia.length) c.push(lista(d.sinMedia) + (d.sinMedia.length > 1 ? " no cuentan" : " no cuenta") + " con matrícula en grado 11° dentro del municipio: la oferta de educación media es en sí misma una brecha territorial.");
   c.push("La inacción frente a la educación media se traduce en menor productividad, estancamiento del crecimiento y pérdida de bienestar social. La media debe asegurar competencias básicas —en particular para quienes llegan a ella sin tenerlas—, abrir espacios de exploración vocacional y ofrecer oportunidades para construir un proyecto de vida.");
   return c;
 }
@@ -895,6 +1209,7 @@ if (window.matchMedia){
 
 /* ---------- Inicio ---------- */
 renderCaptura();
+renderSimat();
 try{
   var tabGuardada = sessionStorage.getItem(CLAVE+"-tab");
   if (tabGuardada){ var bt = document.querySelector('nav.tabs button[data-tab="'+tabGuardada+'"]'); if (bt) bt.click(); }

@@ -9,10 +9,15 @@ Funciona sin internet: Chart.js y SheetJS van incrustados. Los datos se guardan 
 ## Uso
 
 1. Abra `index.html` con doble clic (Chrome, Edge o Firefox).
-2. **Matrícula año por año**: elija el año y escriba la matrícula del grado correspondiente por municipio. Puede pegar una columna copiada de Excel.
-3. **Saber 11 (2026)**: evaluados y estudiantes con niveles 3 o 4 simultáneamente en matemáticas, lectura crítica, ciencias naturales y sociales y ciudadanas (o el porcentaje directo).
-4. **Datos y parámetros**: descargar/cargar plantilla Excel, exportar resultados, respaldo `.json`, datos ficticios de prueba, título, entidad y salario de referencia.
-5. **Informe**: se genera automáticamente; «Imprimir / guardar PDF» produce el documento.
+2. **Datos y parámetros → Cargar archivos del SIMAT**: seleccione o arrastre juntos los archivos de cada año (2016 a 2026), en `.txt` o `.zip`, tal como salen del SIMAT (columnas `ANO`, `ESTADO`, `SECTOR`, `CODIGO_DANE_SEDE`, `DANE`, `GRADO_COD`, `PER_ID`, separadas por `;`).
+   - Cada estudiante se cuenta una vez (`PER_ID`) en el municipio del código DANE de su **sede** y, para cada año, solo en el grado de la cohorte.
+   - Estados que cuentan por defecto: MATRICULADO, GRADUADO y REPROBADO (se pueden cambiar); sector: todos.
+   - **Revisar el municipio de las sedes**: permite corregir sedes codificadas con el municipio equivocado (por ejemplo, sedes de la I.E.T. Agroindustrial Leopoldo García, de Palocabildo, que en el SIMAT tienen código de Falan). La corrección se aplica a todos los años.
+   - La aplicación no guarda datos personales: solo conteos por sede, grado, estado y sector.
+3. **Matrícula año por año**: elija el año y escriba la matrícula del grado correspondiente por municipio. Puede pegar una columna copiada de Excel.
+4. **Saber 11 (2026)**: evaluados y estudiantes con niveles 3 o 4 simultáneamente en matemáticas, lectura crítica, ciencias naturales y sociales y ciudadanas (o el porcentaje directo).
+5. **Datos y parámetros**: además, descargar/cargar plantilla Excel, exportar resultados, respaldo `.json`, datos ficticios de prueba, título, entidad y salario de referencia.
+6. **Informe**: se genera automáticamente; «Imprimir / guardar PDF» produce el documento.
 
 ## Indicadores
 
