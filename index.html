@@ -168,6 +168,16 @@ td.heat{text-align:right;font-variant-numeric:tabular-nums}
 
 <section class="panel" id="p-saber">
   <div class="card">
+    <h2>Cargar informe Saber 11 de la Secretaría (.xlsx)</h2>
+    <p class="nota">El informe de la Dirección de Calidad Educativa trae, para el Tolima, el porcentaje de estudiantes por nivel de desempeño en cada área, y para cada institución el promedio por área, pero no el porcentaje que logra niveles 3 o 4 <b>en las cuatro áreas a la vez</b>, que es el indicador del ORE. La aplicación lo <b>estima</b> con un modelo normal multivariado cuya correlación entre áreas se calibra con los valores medidos por el ORE para la ETC Tolima (2022–2024), y lo distribuye por municipio según los promedios de sus instituciones, ponderados con la matrícula de 11° del SIMAT. Si tiene los conteos reales, escríbalos en la tabla de abajo: siempre tienen prioridad.</p>
+    <div class="fila" style="margin-top:8px">
+      <label class="btn primario">Seleccionar informe Saber 11<input type="file" id="archivoSaberInf" accept=".xlsx,.xls" hidden></label>
+      <button class="btn" id="btnQuitarSaberInf">Quitar estimación</button>
+      <span class="nota" id="msgSaberInf" role="status"></span>
+    </div>
+    <div id="resSaberInf"></div>
+  </div>
+  <div class="card">
     <h2>Resultados de las Pruebas Saber 11 · 2026</h2>
     <p class="nota">Para cada municipio registre cuántos estudiantes de grado 11° presentaron la prueba y cuántos alcanzaron <b>simultáneamente</b> los niveles de desempeño 3 o 4 en matemáticas, lectura crítica, ciencias naturales y sociales y ciudadanas (metodología ORE – Universidad Icesi). Si solo tiene el porcentaje, escríbalo en la última columna; se usa cuando no hay conteos.</p>
     <p class="nota"><span id="avanceSaber"></span></p>
@@ -407,7 +417,7 @@ tabs.forEach(function(b){
     tabs.forEach(function(x){ x.setAttribute("aria-selected", x === b ? "true" : "false"); });
     document.querySelectorAll("section.panel").forEach(function(p){ p.classList.toggle("activo", p.id === b.dataset.tab); });
     if (b.dataset.tab === "p-informe") renderInforme();
-    if (b.dataset.tab === "p-saber") renderSaber();
+    if (b.dataset.tab === "p-saber"){ renderSaber(); renderInformeSaber(); }
     if (b.dataset.tab === "p-captura") renderCaptura();
     if (b.dataset.tab === "p-datos") renderSimat();
     try{ sessionStorage.setItem(CLAVE+"-tab", b.dataset.tab); }catch(e){}
@@ -533,12 +543,13 @@ function fijarSaber(i, k, val){
   var m = MUNICIPIOS[i], n = k === "pct" ? num(val) : entero(val);
   S.saber[m] = S.saber[m] || {};
   if (n === null) delete S.saber[m][k]; else S.saber[m][k] = n;
+  if (k === "pct") delete S.saber[m].estimado;
   guardar();
 }
 function pintarSaber(i){
   var m = MUNICIPIOS[i], s = S.saber[m] || {}, ev = entero(s.evaluados), ig = entero(s.integral), txt = "—";
   if (ev > 0 && ig !== null) txt = ig > ev ? "⚠ mayor que evaluados" : pct(ig / ev * 100);
-  else if (num(s.pct) !== null) txt = pct(num(s.pct)) + " (directo)";
+  else if (num(s.pct) !== null) txt = pct(num(s.pct)) + (s.estimado ? " (estimado)" : " (directo)");
   document.querySelectorAll("#tablaSaber tbody tr")[i].querySelector(".c-pct").textContent = txt;
   var n = MUNICIPIOS.filter(function(x){ var q = S.saber[x] || {}; return (entero(q.evaluados) > 0 && entero(q.integral) !== null) || num(q.pct) !== null; }).length;
   document.getElementById("avanceSaber").textContent = n + " de 46 municipios con resultado de calidad.";
@@ -862,6 +873,8 @@ function renderRevision(){
     h += '<p class="nota"><b>Posibles inconsistencias</b>: sedes urbanas cuyo nombre corresponde a otro municipio.</p><div class="tabla-wrap"><table><thead><tr><th>Código sede</th><th>Sede · institución</th><th>Municipio del código</th><th>Asignar a</th><th>Estudiantes en grado de la cohorte</th></tr></thead><tbody>' +
       sosp.map(function(x){ return filaSede(x.s).replace('<select', '<span class="etq alerta">¿' + esc(x.sug) + '?</span> <select'); }).join("") + '</tbody></table></div>';
   }
+  var nd = discrepanciasSedes().length;
+  if (nd) h += '<p class="nota" style="margin-top:8px">⚠ El informe Saber 11 cargado ubica ' + nd + ' instituciones en un municipio distinto al del código de algunas de sus sedes. Revíselas en la pestaña «2. Saber 11».</p>';
   if (reas.length) h += '<p class="nota" style="margin-top:8px">Sedes reasignadas: ' + reas.length + '. <button class="btn" id="btnDeshacerReas">Deshacer todas las reasignaciones</button></p>';
   h += '<div class="fila" style="margin-top:10px"><input class="txt" id="buscaSede" placeholder="Buscar sede o institución por nombre o código (por ejemplo LEOPOLDO)" style="max-width:520px" value="' + esc(q === "" ? "" : document.getElementById("buscaSede").value) + '"></div>';
   if (q){
@@ -973,6 +986,213 @@ document.getElementById("archivosSimat").addEventListener("change", function(ev)
   z.addEventListener("drop", function(e){ cargarSimat(e.dataTransfer.files); });
 })();
 
+/* ---------- Informe Saber 11 de la Secretaría (.xlsx): estimación de la calidad integral ---------- */
+// Calidad integral (niveles 3–4 simultáneos en LC, MAT, SOC y CN) publicada por el ORE para la ETC Tolima
+var ORE_CALIDAD_TOLIMA = {2022:10.1, 2023:11.6, 2024:11.9};
+var AREAS = ["LC","MAT","SOC","CN"];
+function erf(x){ var s = x < 0 ? -1 : 1; x = Math.abs(x); var t = 1/(1+0.3275911*x);
+  return s*(1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x)); }
+function Phi(x){ return 0.5*(1+erf(x/Math.SQRT2)); }
+function PhiInv(p){ // Acklam
+  var a=[-39.69683028665376,220.9460984245205,-275.9285104469687,138.357751867269,-30.66479806614716,2.506628277459239],
+      b=[-54.47609879822406,161.5858368580409,-155.6989798598866,66.80131188771972,-13.28068155288572],
+      c=[-0.007784894002430293,-0.3223964580411365,-2.400758277161838,-2.549732539343734,4.374664141464968,2.938163982698783],
+      d=[0.007784695709041462,0.3224671290700398,2.445134137142996,3.754408661907416], q, r;
+  p = Math.min(Math.max(p, 1e-9), 1-1e-9);
+  if (p < 0.02425){ q = Math.sqrt(-2*Math.log(p)); return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+  if (p > 1-0.02425){ q = Math.sqrt(-2*Math.log(1-p)); return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+  q = p-0.5; r = q*q; return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+}
+// P(X_i > z_i para todo i) con X normal estándar equicorrelacionada (rho)
+function ortante(z, rho){
+  var n = 801, s = 0, a = Math.sqrt(rho), b = Math.sqrt(1-rho), h = 16/(n-1);
+  for (var k = 0; k < n; k++){
+    var t = -8 + k*h, pr = Math.exp(-t*t/2)/Math.sqrt(2*Math.PI)*h;
+    for (var i = 0; i < z.length; i++) pr *= Phi((a*t - z[i])/b);
+    s += pr;
+  }
+  return s;
+}
+function rhoPara(z, objetivo){
+  var lo = 0.01, hi = 0.99;
+  for (var i = 0; i < 40; i++){ var m = (lo+hi)/2; if (ortante(z, m) < objetivo) lo = m; else hi = m; }
+  return (lo+hi)/2;
+}
+function areaDeHoja(n){
+  var t = normalizar(n);
+  if (/prioriz|rtas|incorrect/.test(t)) return null;
+  if (!/nive|nivl|est/.test(t)) return null;
+  if (/matem/.test(t)) return "MAT";
+  if (/social/.test(t)) return "SOC";
+  if (/ntles|natur/.test(t)) return "CN";
+  if (/lc$|lectura/.test(t)) return "LC";
+  return null;
+}
+function leerInformeSaber(wb){
+  var dep = {}, ie = [], anio = null;
+  wb.SheetNames.forEach(function(n){
+    var a = areaDeHoja(n); if (!a) return;
+    var rows = XLSX.utils.sheet_to_json(wb.Sheets[n], {header:1, defval:""}), y = null;
+    rows.forEach(function(x){
+      var t0 = String(x[0]).trim(), m = t0.match(/(20\d\d)\s*$/);
+      if (m && !/^(COLOMBIA|TOLIMA)/i.test(t0)) y = +m[1];
+      if (/^TOLIMA$/i.test(t0) && y){
+        var mu = num(x[1]), sd = num(x[2]), p3 = num(x[5]), p4 = num(x[6]);
+        if (mu !== null && sd !== null && p3 !== null && p4 !== null){ dep[y] = dep[y] || {}; if (!dep[y][a]) dep[y][a] = {mu:mu, sd:sd, p:p3 + p4}; }
+      }
+    });
+  });
+  wb.SheetNames.forEach(function(n){
+    if (ie.length) return;
+    var rows = XLSX.utils.sheet_to_json(wb.Sheets[n], {header:1, defval:""});
+    for (var i = 0; i < Math.min(rows.length, 40); i++){
+      var h = rows[i].map(normalizar), cM = h.indexOf("municipio"), cI = h.findIndex(function(v){ return /^institucion/.test(v); }),
+          cL = h.findIndex(function(v){ return /^lectura/.test(v); }), cMa = h.indexOf("matematicas"), cS = h.findIndex(function(v){ return /^sociales/.test(v); }), cC = h.findIndex(function(v){ return /^cienciasnat/.test(v); });
+      if (cM >= 0 && cI >= 0 && cL >= 0 && cMa >= 0 && cS >= 0 && cC >= 0){
+        rows.slice(i+1).forEach(function(r){
+          var m = buscarMunicipio(r[cM]);
+          if (!m || !String(r[cI]).trim()) return;
+          var o = {m:m, ie:String(r[cI]).trim(), LC:num(r[cL]), MAT:num(r[cMa]), SOC:num(r[cS]), CN:num(r[cC])};
+          if (AREAS.every(function(a){ return o[a] !== null; })) ie.push(o);
+        });
+        break;
+      }
+    }
+  });
+  Object.keys(dep).forEach(function(y){ if (AREAS.every(function(a){ return dep[y][a]; }) && (!anio || +y > anio)) anio = +y; });
+  if (!anio) throw new Error("no se encontraron las hojas de porcentaje de estudiantes por niveles de desempeño con la fila TOLIMA");
+  if (!ie.length) throw new Error("no se encontró la hoja de resultados por institución (MUNICIPIO, INSTITUCION EDUCATIVA, LECTURA CRITICA, …)");
+  return {anio:anio, dep:dep, ie:ie};
+}
+function institucionesSimat(){
+  // Instituciones del SIMAT por código DANE: nombre, municipio del código, sedes y estudiantes de 11° (2026)
+  var inst = {}, d = S.simat && S.simat[2026], F = filtroSimat();
+  Object.keys(S.sedeInfo || {}).forEach(function(sc){
+    var f = S.sedeInfo[sc], ci = f.ci || ("?" + normalizar(f.i));
+    var x = inst[ci] = inst[ci] || {ci:ci, nom:normalizar(f.i), nombre:f.i, m:municipioDeCodigo(ci), sedes:[], w:0};
+    x.sedes.push(sc);
+    if (d && d.sedes[sc] !== undefined) x.w += cuentaSede(d.sedes[sc], F);
+  });
+  return inst;
+}
+function emparejarInstituciones(inf){
+  // Empareja cada institución del informe Saber (nombre + municipio) con una institución del SIMAT.
+  // 1) mismo nombre y mismo municipio del código DANE; 2) si no hay, el único homónimo que quede libre.
+  var inst = institucionesSimat(), porNom = {}, usados = {}, res = inf.ie.map(function(){ return null; });
+  Object.keys(inst).forEach(function(ci){ (porNom[inst[ci].nom] = porNom[inst[ci].nom] || []).push(inst[ci]); });
+  inf.ie.forEach(function(o, i){
+    var c = (porNom[normalizar(o.ie)] || []).filter(function(x){ return x.m === o.m && !usados[x.ci]; });
+    if (c.length === 1){ res[i] = {inst:c[0], directo:true}; usados[c[0].ci] = 1; }
+  });
+  inf.ie.forEach(function(o, i){
+    if (res[i]) return;
+    var c = (porNom[normalizar(o.ie)] || []).filter(function(x){ return !usados[x.ci]; });
+    if (c.length === 1){ res[i] = {inst:c[0], directo:false}; usados[c[0].ci] = 1; }
+  });
+  return res;
+}
+function estimarCalidad(inf){
+  var calib = [];
+  Object.keys(ORE_CALIDAD_TOLIMA).forEach(function(y){
+    var d = inf.dep[y]; if (!d || !AREAS.every(function(a){ return d[a]; })) return;
+    var z = AREAS.map(function(a){ return PhiInv(1 - d[a].p); });
+    calib.push({anio:+y, ore:ORE_CALIDAD_TOLIMA[y], rho:rhoPara(z, ORE_CALIDAD_TOLIMA[y]/100), z:z});
+  });
+  var rho = calib.length ? calib.reduce(function(s, c){ return s + c.rho; }, 0) / calib.length : 0.76;
+  calib.forEach(function(c){ c.modelo = ortante(c.z, rho) * 100; delete c.z; });
+  var D = inf.dep[inf.anio], z = AREAS.map(function(a){ return PhiInv(1 - D[a].p); });
+  var dep = ortante(z, rho);
+  var corte = {}; AREAS.forEach(function(a, i){ corte[a] = D[a].mu + D[a].sd * z[i]; });
+  // Pesos por institución y descomposición entre / dentro de instituciones
+  var emp = emparejarInstituciones(inf), conPeso = 0, ws = emp.map(function(e){ if (e && e.inst.w > 0){ conPeso++; return e.inst.w; } return null; });
+  var pesos = ws.filter(function(w){ return w; }).sort(function(a,b){ return a-b; }), med = pesos.length ? pesos[Math.floor(pesos.length/2)] : 1;
+  ws = ws.map(function(w){ return w || med; });
+  var sw = ws.reduce(function(s, w){ return s + w; }, 0), media = {}, cov = {};
+  AREAS.forEach(function(a){ media[a] = inf.ie.reduce(function(s, o, i){ return s + ws[i]*o[a]; }, 0) / sw; });
+  AREAS.forEach(function(a){ AREAS.forEach(function(b){ cov[a+b] = inf.ie.reduce(function(s, o, i){ return s + ws[i]*(o[a]-media[a])*(o[b]-media[b]); }, 0) / sw; }); });
+  var sdW = {}; AREAS.forEach(function(a){ sdW[a] = Math.sqrt(Math.max(D[a].sd*D[a].sd - cov[a+a], 0.3*D[a].sd*D[a].sd)); });
+  var rs = [];
+  for (var i = 0; i < 4; i++) for (var j = i+1; j < 4; j++){ var a = AREAS[i], b = AREAS[j]; rs.push((rho*D[a].sd*D[b].sd - cov[a+b]) / (sdW[a]*sdW[b])); }
+  var rhoW = Math.min(0.95, Math.max(0.05, rs.reduce(function(s, r){ return s + r; }, 0) / rs.length));
+  var pIE = inf.ie.map(function(o){ return ortante(AREAS.map(function(a){ return (corte[a] - o[a]) / sdW[a]; }), rhoW); });
+  var prom = pIE.reduce(function(s, p, i){ return s + ws[i]*p; }, 0) / sw, k = prom > 0 ? dep / prom : 1;
+  var mun = {};
+  inf.ie.forEach(function(o, i){ var x = mun[o.m] = mun[o.m] || {w:0, p:0, n:0}; x.w += ws[i]; x.p += ws[i] * Math.min(1, pIE[i]*k); x.n++; });
+  Object.keys(mun).forEach(function(m){ mun[m] = {pct: mun[m].p / mun[m].w * 100, nIE: mun[m].n}; });
+  return {rho:rho, rhoW:rhoW, calib:calib, dep:dep*100, ajuste:k, conPeso:conPeso, nIE:inf.ie.length, mun:mun};
+}
+function aplicarInformeSaber(){
+  var inf = S.saberInforme; if (!inf) return null;
+  var E = estimarCalidad(inf);
+  MUNICIPIOS.forEach(function(m){
+    var s = S.saber[m] = S.saber[m] || {};
+    if (s.estimado || s.pct == null){ if (E.mun[m]){ s.pct = Math.round(E.mun[m].pct * 10) / 10; s.estimado = true; } else if (s.estimado){ delete s.pct; delete s.estimado; } }
+  });
+  inf.est = {rho:E.rho, rhoW:E.rhoW, calib:E.calib, dep:E.dep, ajuste:E.ajuste, conPeso:E.conPeso, nIE:E.nIE};
+  guardar();
+  return E;
+}
+function discrepanciasSedes(){
+  // Instituciones que el informe Saber ubica en un municipio distinto al de su código DANE en el SIMAT
+  var inf = S.saberInforme, out = [];
+  if (!inf || !S.sedeInfo) return out;
+  emparejarInstituciones(inf).forEach(function(e, i){
+    if (!e) return;
+    var o = inf.ie[i], otras = e.inst.sedes.filter(function(sc){ return municipioSede(sc) !== o.m; });
+    if (!otras.length || e.directo && otras.length < e.inst.sedes.length) return; // sede aislada en otro municipio: normal
+    var urb = otras.filter(function(sc){ return (S.sedeInfo[sc].z || "").indexOf("URB") === 0; });
+    var munis = {}; otras.forEach(function(sc){ munis[municipioSede(sc)] = 1; });
+    out.push({ie:o.ie, m:o.m, otras:otras, urbanas:urb, total:e.inst.sedes.length, desde:Object.keys(munis), ci:e.inst.ci});
+  });
+  return out;
+}
+function renderInformeSaber(){
+  var c = document.getElementById("resSaberInf"); if (!c) return;
+  var inf = S.saberInforme;
+  if (!inf){ c.innerHTML = ""; return; }
+  var e = inf.est || {}, h = '<p class="nota">Informe cargado: Saber 11 ' + inf.anio + ' · ' + inf.ie.length + ' instituciones en ' + Object.keys(inf.ie.reduce(function(o, x){ o[x.m] = 1; return o; }, {})).length + ' municipios.' +
+    (inf.anio !== 2026 ? ' <b>Prueba piloto:</b> estos resultados no son de la cohorte 2016–2026 (que presenta la prueba en 2026); úselos solo para probar el flujo.' : '') + '</p>';
+  h += '<div class="kpis">' + kpi(pct(e.dep), "Calidad integral estimada Tolima " + inf.anio, "ORE (medido) 2024: " + pct(REF.tolima.cal)) +
+    kpi(fmt(e.rho, 2), "Correlación entre áreas calibrada con el ORE", (e.calib || []).map(function(x){ return x.anio + ": modelo " + fmt(x.modelo) + " / ORE " + fmt(x.ore); }).join(" · ")) +
+    kpi(e.conPeso + "/" + e.nIE, "instituciones ponderadas con la matrícula de 11° del SIMAT 2026", e.conPeso < e.nIE ? "Las demás usan el peso mediano" : "") + '</div>';
+  var dis = discrepanciasSedes();
+  if (dis.length){
+    h += '<p class="nota"><b>Instituciones con sedes en otro municipio según el SIMAT.</b> El informe Saber las ubica en el municipio indicado, pero en el SIMAT algunas de sus sedes tienen código DANE de otro municipio. Esto cambia la matrícula de la cohorte por municipio.</p><div class="tabla-wrap"><table><thead><tr><th>Institución</th><th>Municipio (Saber)</th><th>Sedes con otro código</th><th></th></tr></thead><tbody>' +
+      dis.map(function(d, i){ return '<tr><td style="white-space:normal">' + esc(d.ie) + '</td><td>' + esc(d.m) + '</td><td class="nota" style="white-space:normal">' + d.otras.length + ' de ' + d.total + ' (código de ' + esc(d.desde.join(", ")) + '; ' + d.urbanas.length + ' urbanas)</td><td style="white-space:nowrap">' +
+        (d.urbanas.length ? '<button class="btn" data-dis="' + i + '" data-modo="urb">Asignar urbanas a ' + esc(d.m) + '</button> ' : '') + '<button class="btn" data-dis="' + i + '" data-modo="todas">Asignar todas</button></td></tr>'; }).join("") + '</tbody></table></div>';
+  }
+  c.innerHTML = h;
+  c.querySelectorAll("button[data-dis]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var d = dis[+b.dataset.dis]; S.reasignar = S.reasignar || {};
+      (b.dataset.modo === "urb" ? d.urbanas : d.otras).forEach(function(sc){ S.reasignar[sc] = d.m; });
+      aplicarSimat(); aplicarInformeSaber(); renderInformeSaber(); renderSaber();
+    });
+  });
+}
+document.getElementById("archivoSaberInf").addEventListener("change", function(ev){
+  var f = ev.target.files[0]; if (!f) return;
+  var st = document.getElementById("msgSaberInf"); st.textContent = "Leyendo " + f.name + "…";
+  var r = new FileReader();
+  r.onload = function(){
+    setTimeout(function(){
+      try{
+        S.saberInforme = leerInformeSaber(XLSX.read(new Uint8Array(r.result), {type:"array"}));
+        S.saberInforme.archivo = f.name;
+        aplicarInformeSaber(); st.textContent = ""; renderInformeSaber(); renderSaber();
+      }catch(e){ st.textContent = "No se pudo leer el informe: " + e.message; }
+      ev.target.value = "";
+    }, 20);
+  };
+  r.readAsArrayBuffer(f);
+});
+document.getElementById("btnQuitarSaberInf").addEventListener("click", function(){
+  if (!S.saberInforme) return;
+  delete S.saberInforme;
+  MUNICIPIOS.forEach(function(m){ var s = S.saber[m]; if (s && s.estimado){ delete s.pct; delete s.estimado; } });
+  guardar(); renderInformeSaber(); renderSaber();
+});
+
 /* ---------- Informe ---------- */
 var graficos = [];
 function destruir(){ graficos.forEach(function(g){ g.destroy(); }); graficos = []; }
@@ -1022,6 +1242,7 @@ function renderInforme(){
     return;
   }
   var completo = C.conPerm === 46 && C.conCal === 46;
+  if (S.saberInforme && S.saberInforme.anio !== 2026) h += '<div class="banner"><b>Prueba piloto:</b> la calidad proviene del informe Saber 11 ' + S.saberInforme.anio + ' de la Secretaría y se estima por municipio; no corresponde a la cohorte 2016–2026, que presenta la prueba en 2026. Los resultados de calidad y de cruce son ilustrativos.</div>';
   if (!completo) h += '<div class="banner">Informe parcial: ' + C.conM1 + ' municipios con matrícula de 2016, ' + C.conPerm + ' con matrícula de 2026 y ' + C.conCal + ' con resultados Saber 11. Los agregados departamentales se calculan con los municipios que tienen los datos requeridos.</div>';
 
   // 1. Contexto
@@ -1046,7 +1267,7 @@ function renderInforme(){
   }
   h += '<div class="kpis">' +
     kpi(pct(d.perm), "Permanencia: llegan a 11° en 2026 por cada 100 que iniciaron 1° en 2016", "ETC Tolima 2024: " + pct(REF.tolima.perm) + " · Colombia: " + pct(REF.colombia.perm)) +
-    kpi(pct(d.cal), "Calidad: estudiantes de 11° con niveles 3–4 en las cuatro áreas", "ETC Tolima 2024: " + pct(REF.tolima.cal) + " · Colombia: " + pct(REF.colombia.cal)) +
+    kpi(pct(d.cal), "Calidad: estudiantes de 11° con niveles 3–4 en las cuatro áreas" + (S.saberInforme ? " (estimada con Saber " + S.saberInforme.anio + ")" : ""), "ETC Tolima 2024: " + pct(REF.tolima.cal) + " · Colombia: " + pct(REF.colombia.cal)) +
     kpi(pct(d.cruce), "Cruce permanencia × calidad", "ETC Tolima 2024: " + pct(REF.tolima.cruce) + " · Colombia: " + pct(REF.colombia.cruce)) +
     kpi(fmt(d.m1Total, 0), "Estudiantes matriculados en grado 1° en 2016", C.conM1 + " de 46 municipios con dato") + '</div>';
 
@@ -1085,6 +1306,8 @@ function renderInforme(){
   h += '<h2>Nota metodológica</h2>';
   var aS = Object.keys(S.simat || {}).sort();
   if (aS.length){ var FS = filtroSimat(); h += '<p>Fuente de la matrícula: archivos del SIMAT para ' + aS.join(", ") + '. Cada estudiante se cuenta una vez (PER_ID) en el municipio del código DANE de su sede y en su grado. Estados incluidos: ' + FS.est.join(", ") + '. Sectores: ' + (FS.sec ? FS.sec.join(", ") : "todos") + '.' + (Object.keys(S.reasignar || {}).length ? ' Se reasignaron manualmente ' + Object.keys(S.reasignar).length + ' sedes cuyo código DANE no correspondía a su municipio: ' + Object.keys(S.reasignar).map(function(k){ return k + " → " + esc(S.reasignar[k]); }).join("; ") + '.' : '') + '</p>'; }
+  if (S.saberInforme && S.saberInforme.est){ var ES = S.saberInforme.est;
+    h += '<p>Estimación de la calidad: el informe Saber 11 ' + S.saberInforme.anio + ' de la Secretaría no reporta el porcentaje de estudiantes con niveles 3 o 4 simultáneos en las cuatro áreas. Se estimó suponiendo puntajes con distribución normal multivariada: los cortes de nivel 3 se ubican de modo que el modelo reproduzca el porcentaje de estudiantes en niveles 3 y 4 de cada área en el Tolima, y la correlación entre áreas (' + fmt(ES.rho, 2) + ') se calibró para reproducir la calidad integral medida por el ORE en la ETC Tolima (' + ES.calib.map(function(x){ return x.anio + ": " + fmt(x.ore) + " medido, " + fmt(x.modelo) + " modelo"; }).join("; ") + '). Por municipio se usaron los promedios por área de ' + ES.nIE + ' instituciones, ponderados con la matrícula de 11° del SIMAT (' + ES.conPeso + ' coincidencias por nombre), separando la variación entre y dentro de instituciones, y se ajustaron para que su promedio coincida con el total departamental (factor ' + fmt(ES.ajuste, 2) + '). Es una aproximación: para el indicador exacto se requieren los resultados por estudiante del ICFES.</p>'; }
   h += '<p>Permanencia: matrícula total en grado 11° en 2026 dividida por la matrícula total en grado 1° en 2016. Es una aproximación por cohorte, no un seguimiento por estudiante, y supone que las entradas y salidas por repitencia y migración se compensan. Calidad: porcentaje de evaluados en Saber 11 que alcanzan niveles de desempeño 3 o 4 simultáneamente en matemáticas, lectura crítica, ciencias naturales y sociales y ciudadanas. Cruce: permanencia × calidad / 100, es decir, el porcentaje estimado de estudiantes que ingresaron a 1° y llegan a 11° con desempeño integral. No todos los estudiantes de 11° presentan la prueba y no se conoce el logro de quienes abandonaron, por lo que la proporción real puede ser menor. El agregado departamental suma la matrícula de los municipios con dato en 2016 y en cada año; la calidad departamental pondera por número de evaluados.</p>';
   h += '<div class="refs"><h3>Referencias</h3>' +
     '<p>Ruiz Patiño, J., Navia Jaramillo, S., Bernal, G. y Maldonado, D. (2026). Las implicaciones de la inacción en la educación media en Colombia. Observatorio de Realidades Educativas – Universidad Icesi.</p>' +

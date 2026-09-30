@@ -15,7 +15,12 @@ Funciona sin internet: Chart.js y SheetJS van incrustados. Los datos se guardan 
    - **Revisar el municipio de las sedes**: permite corregir sedes codificadas con el municipio equivocado (por ejemplo, sedes de la I.E.T. Agroindustrial Leopoldo García, de Palocabildo, que en el SIMAT tienen código de Falan). La corrección se aplica a todos los años.
    - La aplicación no guarda datos personales: solo conteos por sede, grado, estado y sector.
 3. **Matrícula año por año**: elija el año y escriba la matrícula del grado correspondiente por municipio. Puede pegar una columna copiada de Excel.
-4. **Saber 11 (2026)**: evaluados y estudiantes con niveles 3 o 4 simultáneamente en matemáticas, lectura crítica, ciencias naturales y sociales y ciudadanas (o el porcentaje directo).
+4. **Saber 11**: cargue el informe Saber 11 de la Secretaría (`.xlsx`, formato «INF_SABER_AAAA_VC_11») o escriba los conteos reales por municipio.
+   - El informe no trae el % de estudiantes con niveles 3–4 **simultáneos** en las cuatro áreas (indicador ORE); la aplicación lo **estima** con un modelo normal multivariado: los cortes reproducen el % en niveles 3–4 de cada área en el Tolima y la correlación entre áreas se calibra con la calidad integral medida por el ORE para la ETC Tolima 2022–2024 (10,1 / 11,6 / 11,9 %; el modelo obtiene 10,1 / 11,5 / 12,0 %).
+   - Por municipio se usan los promedios por área de cada institución, ponderados con la matrícula de 11° del SIMAT, y se ajustan al total departamental.
+   - El informe Saber también sirve para detectar instituciones cuyo código DANE en el SIMAT es de otro municipio (por ejemplo, I.E.T. Lepanto e I.E. El Bosque, de Murillo, con código de Líbano; I.E.T. Leopoldo García, de Palocabildo, con código de Falan), con botones para corregirlas.
+   - Los conteos reales por municipio, si se escriben, tienen prioridad sobre la estimación.
+5. **Saber 11 (2026), conteos**: evaluados y estudiantes con niveles 3 o 4 simultáneamente en matemáticas, lectura crítica, ciencias naturales y sociales y ciudadanas (o el porcentaje directo).
 5. **Datos y parámetros**: además, descargar/cargar plantilla Excel, exportar resultados, respaldo `.json`, datos ficticios de prueba, título, entidad y salario de referencia.
 6. **Informe**: se genera automáticamente; «Imprimir / guardar PDF» produce el documento.
 
