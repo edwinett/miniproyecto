@@ -322,6 +322,8 @@ function calcular(){
     return {m:m, serie:serie, ret:ret, m1:m1, m11:m11, perm:perm, ev:ev, ig:ig, cal:cal, cruce:cruce, caida:caida,
       completos: serie.filter(function(v){ return v !== null; }).length};
   });
+  // Sin ningún resultado de calidad no hay cruce, ni siquiera en municipios con permanencia 0
+  if (!filas.some(function(f){ return f.cal !== null; })) filas.forEach(function(f){ f.cruce = null; });
   // Cuartiles del cruce
   var vals = filas.filter(function(f){ return f.cruce !== null; }).map(function(f){ return f.cruce; }).sort(function(a,b){ return a-b; });
   function q(p){ if (!vals.length) return null; var pos = (vals.length-1)*p, b = Math.floor(pos), r = pos-b; return vals[b+1] !== undefined ? vals[b] + r*(vals[b+1]-vals[b]) : vals[b]; }
@@ -1077,7 +1079,7 @@ function textoTrayectoria(C){
   }
   var s = t.length ? "Siguiendo la matrícula de la cohorte, " + lista(t) + ". " : "La cohorte tiene datos hasta " + ANIOS[ult] + " (grado " + grado(ANIOS[ult]) + "°), cuando conserva el " + pct(d.ret[ult]) + " de la matrícula inicial. ";
   if (peor && peor.c < 0) s += "La mayor pérdida ocurre en el paso de grado " + grado(ANIOS[peor.i-1]) + "° (" + ANIOS[peor.i-1] + ") a grado " + grado(ANIOS[peor.i]) + "° (" + ANIOS[peor.i] + "), con " + fmt(-peor.c) + " puntos porcentuales menos de la cohorte.";
-  if (d.perm !== null) s += " La permanencia de la cohorte 2016–2026 (" + pct(d.perm) + ") se compara con " + pct(REF.tolima.perm) + " de la cohorte 2024 de la ETC Tolima y " + pct(REF.colombia.perm) + " del promedio nacional reportados por el ORE" + (d.perm > REF.tolima.perm ? ", lo que indica una mejora frente a la cohorte anterior." : ", lo que indica que no hubo mejora frente a la cohorte anterior.");
+  if (d.perm !== null) s += " La permanencia de la cohorte 2016–2026 (" + pct(d.perm) + ") se compara con " + pct(REF.tolima.perm) + " de la cohorte 2024 de la ETC Tolima y " + pct(REF.colombia.perm) + " del promedio nacional reportados por el ORE" + (d.perm > REF.tolima.perm ? ", lo que sugiere una mejora frente a esa cohorte." : ", lo que sugiere que no hubo mejora frente a esa cohorte.");
   return s;
 }
 function textoBrechas(C){
@@ -1090,11 +1092,14 @@ function textoBrechas(C){
   }
   var top = f.slice(0,3).map(function(x){ return x.m + " (" + fmt(x[campo]) + ")"; });
   var bot = f.slice(-3).reverse().map(function(x){ return x.m + " (" + fmt(x[campo]) + ")"; });
-  var max = f[0][campo], min = f[f.length-1][campo];
+  var max = f[0][campo], pos = f.filter(function(x){ return x[campo] > 0; }), min = pos.length ? pos[pos.length-1][campo] : 0;
   var sm = C.dep.sinMedia.length ? lista(C.dep.sinMedia) + (C.dep.sinMedia.length > 1 ? " no registran" : " no registra") + " matrícula en grado 11° en 2026: sus jóvenes deben trasladarse a otro municipio para cursar la media, por lo que su permanencia aparece en cero aunque parte de ellos continúe estudiando en otro lugar. " : "";
   var s = sm + "Mientras en " + lista(top) + " la mayor proporción de estudiantes que ingresaron a 1° en 2016 " + etiqueta + " (por cada 100), en " + lista(bot) + " esta proporción es la más baja del departamento. ";
-  if (min > 0) s += "La brecha entre el municipio con mejor y peor resultado es de " + fmt(max / min) + " veces. ";
-  else s += "Al menos un municipio no registra estudiantes en esta condición. ";
+  if (min > 0) s += "La brecha entre el municipio con mejor resultado y " + (pos.length < f.length ? "el de menor resultado distinto de cero" : "el de peor resultado") + " (" + pos[pos.length-1].m + ") es de " + fmt(max / min) + " veces. ";
+  if (campo === "perm"){
+    var sobre = f.filter(function(x){ return x.perm >= REF.colombia.perm; }).length, bajo = f.filter(function(x){ return x.perm < REF.tolima.perm; }).length;
+    s += sobre + " de " + f.length + " municipios igualan o superan la permanencia nacional de la cohorte 2024 (" + pct(REF.colombia.perm) + ") y " + bajo + " están por debajo de la registrada por la ETC Tolima en esa cohorte (" + pct(REF.tolima.perm) + "). Ibagué, excluida de este análisis por ser entidad certificada, registró " + pct(REF.ibague.perm) + ".";
+  }
   if (campo === "cruce"){
     var sobreCol = f.filter(function(x){ return x.cruce >= REF.colombia.cruce; }).length, bajoTol = f.filter(function(x){ return x.cruce < REF.tolima.cruce; }).length;
     s += sobreCol + " de " + f.length + " municipios igualan o superan el promedio nacional de la cohorte 2024 (" + fmt(REF.colombia.cruce) + ") y " + bajoTol + " están por debajo del valor de la ETC Tolima en esa cohorte (" + fmt(REF.tolima.cruce) + "). ";
@@ -1125,7 +1130,7 @@ function conclusiones(C){
   var d = C.dep, c = [];
   if (d.cruce !== null) c.push("<b>Solo " + fmt(d.cruce) + " de cada 100 estudiantes que ingresaron a grado 1° en 2016 en los municipios no certificados del Tolima llegaron a grado 11° en 2026 y lograron desarrollar de manera integral las competencias básicas</b>, frente a " + fmt(REF.colombia.cruce) + " en el promedio nacional de la cohorte 2024.");
   else if (d.perm !== null) c.push("<b>" + fmt(d.perm) + " de cada 100 estudiantes que ingresaron a grado 1° en 2016 llegaron a grado 11° en 2026.</b> Falta completar los resultados Saber 11 para estimar el desarrollo integral de competencias.");
-  if (d.perm !== null) c.push("La permanencia de la cohorte (" + pct(d.perm) + ") " + (d.perm >= REF.colombia.perm ? "alcanza o supera" : "sigue por debajo de") + " el promedio nacional (" + pct(REF.colombia.perm) + "): cerca de " + fmt(Math.max(0, 100 - Math.min(d.perm, 100)), 0) + " de cada 100 niños y niñas no completaron su trayectoria en el tiempo esperado.");
+  if (d.perm !== null) c.push("La permanencia de la cohorte (" + pct(d.perm) + ") " + (d.perm >= REF.colombia.perm ? "alcanza o supera el" : "sigue por debajo del") + " promedio nacional (" + pct(REF.colombia.perm) + "): cerca de " + fmt(Math.max(0, 100 - Math.min(d.perm, 100)), 0) + " de cada 100 niños y niñas no completaron su trayectoria en el tiempo esperado.");
   var f = (C.conCruce.length ? C.conCruce : []).slice().sort(function(a,b){ return b.cruce - a.cruce; });
   if (f.length >= 2){
     c.push("Las brechas entre municipios son amplias: " + f[0].m + " registra " + fmt(f[0].cruce) + " de cada 100 y " + f[f.length-1].m + " " + fmt(f[f.length-1].cruce) + ". " +
