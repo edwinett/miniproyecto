@@ -1,0 +1,13 @@
+{
+  "name": "informe-cohorte-tolima",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aplicación offline para el informe de permanencia y calidad de la cohorte 2016-2026 en los 46 municipios no certificados del Tolima",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "devDependencies": {
+    "chart.js": "4.4.1",
+    "xlsx": "0.18.5"
+  }
+}

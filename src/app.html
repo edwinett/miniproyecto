@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trayectoria Educativa Tolima</title>
+<meta name="description" content="Aplicación offline para construir el informe de permanencia y calidad de la cohorte 2016–2026 en los 46 municipios no certificados del Tolima.">
+<style>
+:root{
+  color-scheme: light;
+  --bg:#f9f9f7; --surface:#fcfcfb; --surface2:#f3f2ee; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.12);
+  --s1:#2a78d6; --accent:#1c5cab; --accent-ink:#ffffff;
+  --dot-integral:#184f95; --dot-llega:#86b6ef; --dot-no:#e1e0d9;
+  --good:#0ca30c; --good-text:#006300; --warn:#fab219; --warn-text:#8a5a00; --crit:#d03b3b;
+  --ref1:#52514e; --ref2:#d03b3b;
+  --banner-bg:#fff4d6; --banner-ink:#6b4a00;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0d0d0d; --surface:#1a1a19; --surface2:#232322; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.12);
+    --s1:#3987e5; --accent:#3987e5; --accent-ink:#ffffff;
+    --dot-integral:#6da7ec; --dot-llega:#1c5cab; --dot-no:#383835;
+    --good-text:#0ca30c; --warn-text:#fab219;
+    --ref1:#c3c2b7; --ref2:#e66767;
+    --banner-bg:#3a2f12; --banner-ink:#fbd78a;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0d0d0d; --surface:#1a1a19; --surface2:#232322; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.12);
+  --s1:#3987e5; --accent:#3987e5; --accent-ink:#ffffff;
+  --dot-integral:#6da7ec; --dot-llega:#1c5cab; --dot-no:#383835;
+  --good-text:#0ca30c; --warn-text:#fab219;
+  --ref1:#c3c2b7; --ref2:#e66767;
+  --banner-bg:#3a2f12; --banner-ink:#fbd78a;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header.app{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 16px}
+header.app h1{margin:0;font-size:1.15rem}
+header.app p{margin:2px 0 0;color:var(--ink2);font-size:.88rem}
+nav.tabs{display:flex;gap:4px;flex-wrap:wrap;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
+nav.tabs button{border:1px solid transparent;background:none;color:var(--ink2);padding:7px 12px;border-radius:8px;font:inherit;cursor:pointer}
+nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+nav.tabs button:hover:not([aria-selected="true"]){background:var(--surface2)}
+main{max-width:1120px;margin:0 auto;padding:16px}
+section.panel{display:none}
+section.panel.activo{display:block}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
+.card h2{margin:0 0 6px;font-size:1.05rem}
+.nota{color:var(--ink2);font-size:.88rem}
+.fila{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button.btn,label.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface2);color:var(--ink);padding:8px 12px;border-radius:8px;font:inherit;font-size:.9rem;cursor:pointer}
+button.btn.primario,label.btn.primario{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+button.btn.peligro{color:var(--crit)}
+button.btn:hover,label.btn:hover{filter:brightness(.96)}
+.anios{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px;margin:10px 0}
+.anios button{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:10px;padding:6px 4px;cursor:pointer;font:inherit;text-align:center}
+.anios button b{display:block;font-size:.98rem}
+.anios button span{display:block;font-size:.75rem;color:var(--ink2)}
+.anios button .barra{height:4px;border-radius:2px;background:var(--grid);margin-top:4px;overflow:hidden}
+.anios button .barra i{display:block;height:100%;background:var(--s1)}
+.anios button[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:1px}
+.tabla-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{padding:6px 8px;border-bottom:1px solid var(--grid);text-align:left;white-space:nowrap}
+th{background:var(--surface2);font-weight:600;position:sticky;top:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:none}
+input.cel{width:110px;padding:5px 7px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit;text-align:right;font-variant-numeric:tabular-nums}
+input.cel:focus{outline:2px solid var(--accent);outline-offset:0}
+input.txt{padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit;width:100%}
+.etq{display:inline-flex;align-items:center;gap:4px;font-size:.78rem;padding:1px 7px;border-radius:999px;border:1px solid var(--border);color:var(--ink2)}
+.etq.ok{color:var(--good-text)}
+.etq.alerta{color:var(--warn-text)}
+.etq.falta{color:var(--muted)}
+.params{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.params label{display:block;font-size:.85rem;color:var(--ink2)}
+.banner{background:var(--banner-bg);color:var(--banner-ink);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:.9rem}
+.vacio{padding:28px;text-align:center;color:var(--ink2)}
+/* Informe */
+#informe h1{font-size:1.5rem;margin:0 0 4px;line-height:1.25}
+#informe h2{font-size:1.2rem;margin:26px 0 8px;padding-top:6px;border-top:1px solid var(--grid)}
+#informe h3{font-size:1rem;margin:16px 0 6px}
+#informe p{margin:0 0 10px;max-width:78ch}
+#informe .destacado{font-size:1.1rem;font-weight:600;margin:14px 0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0}
+.kpi{background:var(--surface2);border-radius:10px;padding:12px}
+.kpi .v{font-size:1.7rem;font-weight:700;line-height:1.1}
+.kpi .l{font-size:.82rem;color:var(--ink2)}
+.kpi .r{font-size:.78rem;color:var(--muted);margin-top:4px}
+.puntos-wrap{display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.puntos{display:grid;grid-template-columns:repeat(10,16px);gap:4px}
+.puntos i{width:16px;height:16px;border-radius:50%;background:var(--dot-no)}
+.puntos i.int{background:var(--dot-integral)}
+.puntos i.lle{background:var(--dot-llega)}
+.leyenda{display:flex;flex-direction:column;gap:6px;font-size:.88rem}
+.leyenda span{display:flex;align-items:center;gap:8px}
+.leyenda i{width:12px;height:12px;border-radius:50%;display:inline-block}
+.grafico{position:relative;width:100%;margin:8px 0 4px}
+.fuente{font-size:.78rem;color:var(--muted);margin-bottom:12px}
+ul.concl li{margin-bottom:8px;max-width:80ch}
+th.ord{cursor:pointer;user-select:none}
+th.ord:after{content:" \2195";color:var(--muted);font-weight:400}
+td.heat{text-align:right;font-variant-numeric:tabular-nums}
+.refs p{font-size:.84rem;color:var(--ink2)}
+@media (max-width:600px){
+  main{padding:12px}
+  input.cel{width:88px}
+  .kpi .v{font-size:1.4rem}
+}
+@media print{
+  :root,:root[data-theme]{color-scheme:light;
+    --bg:#fff; --surface:#fff; --surface2:#f3f2ee; --ink:#0b0b0b; --ink2:#52514e; --grid:#e1e0d9; --border:rgba(11,11,11,.12);
+    --s1:#2a78d6; --dot-integral:#184f95; --dot-llega:#86b6ef; --dot-no:#e1e0d9; --ref1:#52514e; --ref2:#d03b3b;
+    --banner-bg:#fff4d6; --banner-ink:#6b4a00; --good-text:#006300; --warn-text:#8a5a00}
+  header.app,nav.tabs,section.panel:not(#p-informe),.no-print{display:none!important}
+  section#p-informe{display:block!important}
+  main{max-width:none;padding:0}
+  .card{border:none;padding:0}
+  #informe h2{break-before:auto;break-after:avoid}
+  .grafico,.kpis,.puntos-wrap,tr{break-inside:avoid}
+  .tabla-wrap{overflow:visible;border:none}
+  th{position:static}
+  .salto{break-before:page}
+  body{font-size:11pt}
+}
+</style>
+</head>
+<body>
+<header class="app">
+  <h1>Informe de trayectoria educativa · Cohorte 2016–2026 · Tolima</h1>
+  <p>46 municipios no certificados del departamento (sin Ibagué). Los niños que ingresaron a grado 1° en 2016 deberían culminar grado 11° en 2026. Todo se procesa en este equipo: ningún dato se envía a internet.</p>
+</header>
+<nav class="tabs" role="tablist">
+  <button role="tab" data-tab="p-captura" aria-selected="true">1. Matrícula año por año</button>
+  <button role="tab" data-tab="p-saber" aria-selected="false">2. Saber 11 (2026)</button>
+  <button role="tab" data-tab="p-datos" aria-selected="false">3. Datos y parámetros</button>
+  <button role="tab" data-tab="p-informe" aria-selected="false">4. Informe</button>
+</nav>
+<main>
+
+<section class="panel activo" id="p-captura">
+  <div class="card">
+    <h2>Matrícula de la cohorte, año por año</h2>
+    <p class="nota">Seleccione el año. En cada año se registra la matrícula del grado en que debería estar la cohorte: 2016 → 1°, 2017 → 2°, … 2026 → 11°. Puede pegar una columna completa copiada de Excel en la primera casilla: los valores se reparten hacia abajo en el orden de la lista.</p>
+    <div class="anios" id="anios"></div>
+  </div>
+  <div class="card">
+    <div class="fila" style="justify-content:space-between">
+      <h2 id="tituloAnio" style="margin:0"></h2>
+      <span class="nota" id="avanceAnio"></span>
+    </div>
+    <div class="tabla-wrap" style="margin-top:10px"><table id="tablaCaptura"></table></div>
+  </div>
+</section>
+
+<section class="panel" id="p-saber">
+  <div class="card">
+    <h2>Resultados de las Pruebas Saber 11 · 2026</h2>
+    <p class="nota">Para cada municipio registre cuántos estudiantes de grado 11° presentaron la prueba y cuántos alcanzaron <b>simultáneamente</b> los niveles de desempeño 3 o 4 en matemáticas, lectura crítica, ciencias naturales y sociales y ciudadanas (metodología ORE – Universidad Icesi). Si solo tiene el porcentaje, escríbalo en la última columna; se usa cuando no hay conteos.</p>
+    <p class="nota"><span id="avanceSaber"></span></p>
+    <div class="tabla-wrap"><table id="tablaSaber"></table></div>
+  </div>
+</section>
+
+<section class="panel" id="p-datos">
+  <div class="card">
+    <h2>Importar y exportar</h2>
+    <p class="nota">Descargue la plantilla de Excel, llénela con los datos del SIMAT/MEN y del ICFES, y cárguela aquí. Los datos quedan guardados en este navegador; haga copias de respaldo con regularidad.</p>
+    <div class="fila" style="margin-top:10px">
+      <button class="btn" id="btnPlantilla">Descargar plantilla Excel</button>
+      <label class="btn primario">Cargar Excel diligenciado<input type="file" id="archivoExcel" accept=".xlsx,.xls" hidden></label>
+      <button class="btn" id="btnExportar">Exportar datos y resultados (Excel)</button>
+    </div>
+    <div class="fila" style="margin-top:10px">
+      <button class="btn" id="btnRespaldo">Guardar respaldo (.json)</button>
+      <label class="btn">Restaurar respaldo<input type="file" id="archivoJson" accept=".json" hidden></label>
+      <button class="btn" id="btnEjemplo">Cargar datos de ejemplo (ficticios)</button>
+      <button class="btn peligro" id="btnBorrar">Borrar todos los datos</button>
+    </div>
+    <p class="nota" id="msgDatos" role="status" style="margin-top:10px"></p>
+  </div>
+  <div class="card">
+    <h2>Parámetros del informe</h2>
+    <div class="params">
+      <label>Título del informe<input class="txt" data-param="titulo"></label>
+      <label>Entidad que elabora<input class="txt" data-param="entidad"></label>
+      <label>Autores / equipo<input class="txt" data-param="autor"></label>
+      <label>Salario de referencia mensual (COP)<input class="txt" data-param="salario" inputmode="numeric"></label>
+      <label>Retorno salarial de culminar la media (%)<input class="txt" data-param="retornoMedia" inputmode="decimal"></label>
+    </div>
+    <p class="nota" style="margin-top:8px">El salario de referencia y el retorno se usan solo en la estimación ilustrativa de ingresos no percibidos. Por defecto: salario mínimo 2025 (1.423.500 COP; actualícelo al vigente) y 16,5 % de retorno marginal de terminar la media frente a iniciarla sin terminarla (Sánchez et al., 2016).</p>
+  </div>
+</section>
+
+<section class="panel" id="p-informe">
+  <div class="card no-print">
+    <div class="fila">
+      <button class="btn primario" id="btnImprimir">Imprimir / guardar PDF</button>
+      <button class="btn" id="btnExportar2">Exportar Excel</button>
+      <span class="nota">Para PDF elija «Guardar como PDF» en el cuadro de impresión.</span>
+    </div>
+  </div>
+  <div class="card"><article id="informe"></article></div>
+</section>
+
+</main>
+
+<script>/*__CHARTJS__*/</script>
+<script>/*__XLSX__*/</script>
+<script>
+"use strict";
+var MUNICIPIOS = ["Alpujarra","Alvarado","Ambalema","Anzoátegui","Armero Guayabal","Ataco","Cajamarca","Carmen de Apicalá","Casabianca","Chaparral","Coello","Coyaima","Cunday","Dolores","Espinal","Falan","Flandes","Fresno","Guamo","Herveo","Honda","Icononzo","Lérida","Líbano","Mariquita","Melgar","Murillo","Natagaima","Ortega","Palocabildo","Piedras","Planadas","Prado","Purificación","Rioblanco","Roncesvalles","Rovira","Saldaña","San Antonio","San Luis","Santa Isabel","Suárez","Valle de San Juan","Venadillo","Villahermosa","Villarrica"];
+var ALIAS = {"armero":"Armero Guayabal","guayabal":"Armero Guayabal","sansebastiandemariquita":"Mariquita","elespinal":"Espinal","carmendeapicala":"Carmen de Apicalá","elcarmendeapicala":"Carmen de Apicalá","valledesanjuan":"Valle de San Juan","sanluis":"San Luis","libano":"Líbano","ellibano":"Líbano","falan":"Falan","villarica":"Villarrica","elguamo":"Guamo"};
+var ANIOS = [2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026];
+function grado(a){ return a - 2015; }
+/* Referencias del informe ORE-Icesi (enero 2026), cohorte 2024 */
+var REF = {
+  colombia:{perm:56.7, cal:22.8, cruce:12.9},
+  tolima:{perm:44.0, cal:11.9, cruce:5.2},
+  ibague:{perm:67.3, cal:27.7, cruce:18.6},
+  tolimaSerie:[[2022,41.1,10.1,4.2],[2023,43.9,11.6,5.1],[2024,44.0,11.9,5.2]]
+};
+var CLAVE = "informe-tolima-cohorte-2016-2026-v1";
+
+function normalizar(t){ return String(t==null?"":t).normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,""); }
+var INDICE = {};
+MUNICIPIOS.forEach(function(m){ INDICE[normalizar(m)] = m; });
+Object.keys(ALIAS).forEach(function(k){ INDICE[k] = ALIAS[k]; });
+function buscarMunicipio(t){
+  var n = normalizar(t).replace(/^tolima/,"").replace(/tolima$/,"");
+  if (INDICE[n]) return INDICE[n];
+  for (var k in INDICE){ if (n.length > 4 && (n.indexOf(k) === 0 || k.indexOf(n) === 0)) return INDICE[k]; }
+  return null;
+}
+
+function vacio(){
+  return {version:1, matricula:{}, saber:{}, ejemplo:false,
+    params:{titulo:"Las implicaciones de la inacción en la educación media en el Tolima",
+      entidad:"", autor:"", salario:1423500, retornoMedia:16.5}};
+}
+function cargar(){
+  try{ var t = localStorage.getItem(CLAVE); if (t){ var o = JSON.parse(t); var b = vacio(); o.params = Object.assign(b.params, o.params||{}); return Object.assign(b, o); } }catch(e){}
+  return vacio();
+}
+var S = cargar();
+function guardar(){ try{ localStorage.setItem(CLAVE, JSON.stringify(S)); }catch(e){} }
+
+function num(v){
+  if (v === null || v === undefined || v === "") return null;
+  if (typeof v === "number") return isFinite(v) ? v : null;
+  var t = String(v).trim().replace(/\s/g,"");
+  if (!t) return null;
+  if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g,"");
+  t = t.replace(/,/g,".");
+  var n = parseFloat(t);
+  return isFinite(n) ? n : null;
+}
+function entero(v){ var n = num(v); return n === null ? null : Math.round(n); }
+function fmt(n, d){
+  if (n === null || n === undefined || !isFinite(n)) return "—";
+  d = d === undefined ? 1 : d;
+  return n.toLocaleString("es-CO",{minimumFractionDigits:d, maximumFractionDigits:d});
+}
+function pct(n, d){ return n === null || n === undefined ? "—" : fmt(n, d === undefined ? 1 : d) + " %"; }
+function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+/* ---------- Cálculos ---------- */
+function calcular(){
+  var filas = MUNICIPIOS.map(function(m){
+    var mat = S.matricula[m] || {};
+    var serie = ANIOS.map(function(a){ return entero(mat[a]); });
+    var m1 = serie[0], m11 = serie[10];
+    var ret = serie.map(function(v){ return (m1 > 0 && v !== null) ? v / m1 * 100 : null; });
+    var perm = ret[10];
+    var sb = S.saber[m] || {};
+    var ev = entero(sb.evaluados), ig = entero(sb.integral), p = num(sb.pct), cal = null;
+    if (ev > 0 && ig !== null) cal = ig / ev * 100; else if (p !== null) cal = p;
+    var cruce = (perm !== null && cal !== null) ? perm * cal / 100 : null;
+    var caida = null;
+    for (var i = 1; i < serie.length; i++){
+      if (serie[i-1] > 0 && serie[i] !== null){
+        var d = (serie[i] - serie[i-1]) / serie[i-1] * 100;
+        if (caida === null || d < caida.v) caida = {v:d, desde:ANIOS[i-1], hasta:ANIOS[i]};
+      }
+    }
+    return {m:m, serie:serie, ret:ret, m1:m1, m11:m11, perm:perm, ev:ev, ig:ig, cal:cal, cruce:cruce, caida:caida,
+      completos: serie.filter(function(v){ return v !== null; }).length};
+  });
+  // Cuartiles del cruce
+  var vals = filas.filter(function(f){ return f.cruce !== null; }).map(function(f){ return f.cruce; }).sort(function(a,b){ return a-b; });
+  function q(p){ if (!vals.length) return null; var pos = (vals.length-1)*p, b = Math.floor(pos), r = pos-b; return vals[b+1] !== undefined ? vals[b] + r*(vals[b+1]-vals[b]) : vals[b]; }
+  var q1 = q(.25), q2 = q(.5), q3 = q(.75);
+  filas.forEach(function(f){
+    f.cuartil = null;
+    if (f.cruce === null || vals.length < 4) return;
+    f.cuartil = f.cruce <= q1 ? 1 : f.cruce <= q2 ? 2 : f.cruce <= q3 ? 3 : 4;
+  });
+  // Agregado departamental: panel de municipios con dato en 2016
+  var dep = {total:[], ret:[], base:[]};
+  ANIOS.forEach(function(a, i){
+    var t = 0, b = 0, n = 0;
+    filas.forEach(function(f){ if (f.m1 > 0 && f.serie[i] !== null){ t += f.serie[i]; b += f.m1; n++; } });
+    dep.total.push(n ? t : null); dep.base.push(n ? b : null); dep.ret.push(n && b ? t / b * 100 : null);
+  });
+  dep.m1 = dep.base[10]; dep.m11 = dep.total[10];
+  dep.perm = dep.ret[10];
+  var sEv = 0, sIg = 0, sw = 0, sp = 0;
+  filas.forEach(function(f){
+    if (f.cal === null) return;
+    if (f.ev > 0 && f.ig !== null){ sEv += f.ev; sIg += f.ig; }
+    else { var w = f.m11 || 1; sw += w; sp += w * f.cal; }
+  });
+  // Pondera por evaluados; los municipios con solo porcentaje se ponderan por su matrícula de 11°
+  if (sEv && sw) dep.cal = (sIg + sp / 100) / (sEv + sw) * 100;
+  else if (sEv) dep.cal = sIg / sEv * 100;
+  else if (sw) dep.cal = sp / sw;
+  else dep.cal = null;
+  dep.cruce = (dep.perm !== null && dep.cal !== null) ? dep.perm * dep.cal / 100 : null;
+  dep.m1Total = filas.reduce(function(s,f){ return s + (f.m1||0); }, 0);
+  var conCruce = filas.filter(function(f){ return f.cruce !== null; });
+  return {filas:filas, dep:dep, q:[q1,q2,q3], conCruce:conCruce,
+    conM1: filas.filter(function(f){ return f.m1 !== null; }).length,
+    conPerm: filas.filter(function(f){ return f.perm !== null; }).length,
+    conCal: filas.filter(function(f){ return f.cal !== null; }).length};
+}
+var NOMBRE_CUARTIL = {1:"Cuartil 1 (más bajo)",2:"Cuartil 2 (bajo)",3:"Cuartil 3 (medio)",4:"Cuartil 4 (alto)"};
+
+/* ---------- Pestañas ---------- */
+var tabs = document.querySelectorAll("nav.tabs button");
+tabs.forEach(function(b){
+  b.addEventListener("click", function(){
+    tabs.forEach(function(x){ x.setAttribute("aria-selected", x === b ? "true" : "false"); });
+    document.querySelectorAll("section.panel").forEach(function(p){ p.classList.toggle("activo", p.id === b.dataset.tab); });
+    if (b.dataset.tab === "p-informe") renderInforme();
+    if (b.dataset.tab === "p-saber") renderSaber();
+    if (b.dataset.tab === "p-captura") renderCaptura();
+    try{ sessionStorage.setItem(CLAVE+"-tab", b.dataset.tab); }catch(e){}
+  });
+});
+
+/* ---------- Captura de matrícula ---------- */
+var anioSel = 2016;
+try{ var guardado = parseInt(sessionStorage.getItem(CLAVE+"-anio"),10); if (ANIOS.indexOf(guardado) >= 0) anioSel = guardado; }catch(e){}
+
+function contarAnio(a){ var n = 0; MUNICIPIOS.forEach(function(m){ if (S.matricula[m] && entero(S.matricula[m][a]) !== null) n++; }); return n; }
+function renderAnios(){
+  var h = "";
+  ANIOS.forEach(function(a){
+    var n = contarAnio(a);
+    h += '<button type="button" data-anio="'+a+'" aria-pressed="'+(a===anioSel)+'"><b>'+a+'</b><span>Grado '+grado(a)+'° · '+n+'/46</span><div class="barra"><i style="width:'+(n/46*100)+'%"></i></div></button>';
+  });
+  var cont = document.getElementById("anios");
+  cont.innerHTML = h;
+  cont.querySelectorAll("button").forEach(function(b){
+    b.addEventListener("click", function(){ anioSel = +b.dataset.anio; try{ sessionStorage.setItem(CLAVE+"-anio", anioSel); }catch(e){} renderCaptura(); });
+  });
+}
+function valorMat(m, a){ return S.matricula[m] ? entero(S.matricula[m][a]) : null; }
+function celdasFila(m){
+  var a = anioSel, v = valorMat(m, a), prev = a > 2016 ? valorMat(m, a-1) : null, base = valorMat(m, 2016);
+  var varr = (v !== null && prev > 0) ? (v - prev) / prev * 100 : null;
+  var ret = (v !== null && base > 0) ? v / base * 100 : null;
+  var estado;
+  if (v === null) estado = '<span class="etq falta">○ Sin dato</span>';
+  else if (varr !== null && varr > 15) estado = '<span class="etq alerta">▲ Aumento inusual, revisar</span>';
+  else if (varr !== null && varr < -35) estado = '<span class="etq alerta">▼ Caída fuerte, revisar</span>';
+  else estado = '<span class="etq ok">✓ Registrado</span>';
+  return {prev: a > 2016 ? fmt(prev,0) : "", varr: a > 2016 ? pct(varr) : "", ret: pct(ret), estado: estado};
+}
+function renderCaptura(){
+  renderAnios();
+  var a = anioSel;
+  document.getElementById("tituloAnio").textContent = "Año " + a + " · matrícula en grado " + grado(a) + "°";
+  document.getElementById("avanceAnio").textContent = contarAnio(a) + " de 46 municipios con dato";
+  var h = '<thead><tr><th>#</th><th>Municipio</th><th class="num">Matrícula grado '+grado(a)+'° ('+a+')</th>' +
+    (a > 2016 ? '<th class="num">Grado '+grado(a-1)+'° ('+(a-1)+')</th><th class="num">Variación anual</th>' : '') +
+    '<th class="num">% frente a 1° (2016)</th><th>Estado</th></tr></thead><tbody>';
+  MUNICIPIOS.forEach(function(m, i){
+    var c = celdasFila(m), v = valorMat(m, a);
+    h += '<tr data-m="'+esc(m)+'"><td class="num">'+(i+1)+'</td><td>'+esc(m)+'</td><td class="num"><input class="cel" inputmode="numeric" data-i="'+i+'" aria-label="Matrícula '+esc(m)+' '+a+'" value="'+(v===null?"":v)+'"></td>' +
+      (a > 2016 ? '<td class="num c-prev">'+c.prev+'</td><td class="num c-var">'+c.varr+'</td>' : '') +
+      '<td class="num c-ret">'+c.ret+'</td><td class="c-est">'+c.estado+'</td></tr>';
+  });
+  h += '</tbody>';
+  var t = document.getElementById("tablaCaptura");
+  t.innerHTML = h;
+  t.querySelectorAll("input.cel").forEach(function(inp){
+    inp.addEventListener("input", function(){ fijarMat(MUNICIPIOS[+inp.dataset.i], inp.value); actualizarFila(+inp.dataset.i); });
+    inp.addEventListener("paste", function(ev){ pegarColumna(ev, +inp.dataset.i, function(idx, val){ fijarMat(MUNICIPIOS[idx], val); }, renderCaptura); });
+    inp.addEventListener("keydown", function(ev){ moverConFlechas(ev, t, +inp.dataset.i); });
+  });
+}
+function fijarMat(m, val){
+  var n = entero(val);
+  S.matricula[m] = S.matricula[m] || {};
+  if (n === null) delete S.matricula[m][anioSel]; else S.matricula[m][anioSel] = n;
+  guardar();
+}
+function actualizarFila(i){
+  var m = MUNICIPIOS[i], tr = document.querySelectorAll("#tablaCaptura tbody tr")[i], c = celdasFila(m);
+  if (anioSel > 2016){ tr.querySelector(".c-var").textContent = c.varr; }
+  tr.querySelector(".c-ret").textContent = c.ret;
+  tr.querySelector(".c-est").innerHTML = c.estado;
+  document.getElementById("avanceAnio").textContent = contarAnio(anioSel) + " de 46 municipios con dato";
+  var b = document.querySelector('#anios button[data-anio="'+anioSel+'"]'), n = contarAnio(anioSel);
+  b.querySelector("span").textContent = "Grado " + grado(anioSel) + "° · " + n + "/46";
+  b.querySelector(".barra i").style.width = (n/46*100) + "%";
+}
+function pegarColumna(ev, desde, fijar, rehacer){
+  var t = (ev.clipboardData || window.clipboardData).getData("text");
+  if (!/[\r\n\t]/.test(t.trim())) return;
+  ev.preventDefault();
+  var lineas = t.replace(/\r/g,"").split("\n");
+  if (lineas[lineas.length-1] === "") lineas.pop();
+  lineas.forEach(function(l, k){
+    var idx = desde + k; if (idx >= MUNICIPIOS.length) return;
+    fijar(idx, l.split("\t"));
+  });
+  rehacer();
+}
+function moverConFlechas(ev, tabla, i){
+  if (ev.key !== "ArrowDown" && ev.key !== "ArrowUp" && ev.key !== "Enter") return;
+  var col = Array.prototype.indexOf.call(ev.target.closest("tr").querySelectorAll("input"), ev.target);
+  var filas = tabla.querySelectorAll("tbody tr"), j = ev.key === "ArrowUp" ? i - 1 : i + 1;
+  if (j < 0 || j >= filas.length) return;
+  ev.preventDefault();
+  var dest = filas[j].querySelectorAll("input")[col]; if (dest){ dest.focus(); dest.select(); }
+}
+
+/* ---------- Saber 11 ---------- */
+function renderSaber(){
+  var h = '<thead><tr><th>#</th><th>Municipio</th><th class="num">Evaluados en 11°</th><th class="num">Con niveles 3–4 en las 4 áreas</th><th class="num">% calculado</th><th class="num">o % directo</th></tr></thead><tbody>';
+  MUNICIPIOS.forEach(function(m, i){
+    var s = S.saber[m] || {};
+    h += '<tr><td class="num">'+(i+1)+'</td><td>'+esc(m)+'</td>' +
+      '<td class="num"><input class="cel" inputmode="numeric" data-i="'+i+'" data-k="evaluados" value="'+(s.evaluados==null?"":s.evaluados)+'"></td>' +
+      '<td class="num"><input class="cel" inputmode="numeric" data-i="'+i+'" data-k="integral" value="'+(s.integral==null?"":s.integral)+'"></td>' +
+      '<td class="num c-pct"></td>' +
+      '<td class="num"><input class="cel" inputmode="decimal" data-i="'+i+'" data-k="pct" value="'+(s.pct==null?"":String(s.pct).replace(".",","))+'"></td></tr>';
+  });
+  var t = document.getElementById("tablaSaber");
+  t.innerHTML = h + '</tbody>';
+  MUNICIPIOS.forEach(function(m, i){ pintarSaber(i); });
+  t.querySelectorAll("input.cel").forEach(function(inp){
+    var k = inp.dataset.k;
+    inp.addEventListener("input", function(){ fijarSaber(+inp.dataset.i, k, inp.value); pintarSaber(+inp.dataset.i); });
+    inp.addEventListener("paste", function(ev){
+      var claves = ["evaluados","integral","pct"], c0 = claves.indexOf(k);
+      pegarColumna(ev, +inp.dataset.i, function(idx, celdas){
+        celdas.forEach(function(v, j){ if (claves[c0+j]) fijarSaber(idx, claves[c0+j], v); });
+      }, renderSaber);
+    });
+    inp.addEventListener("keydown", function(ev){ moverConFlechas(ev, t, +inp.dataset.i); });
+  });
+}
+function fijarSaber(i, k, val){
+  var m = MUNICIPIOS[i], n = k === "pct" ? num(val) : entero(val);
+  S.saber[m] = S.saber[m] || {};
+  if (n === null) delete S.saber[m][k]; else S.saber[m][k] = n;
+  guardar();
+}
+function pintarSaber(i){
+  var m = MUNICIPIOS[i], s = S.saber[m] || {}, ev = entero(s.evaluados), ig = entero(s.integral), txt = "—";
+  if (ev > 0 && ig !== null) txt = ig > ev ? "⚠ mayor que evaluados" : pct(ig / ev * 100);
+  else if (num(s.pct) !== null) txt = pct(num(s.pct)) + " (directo)";
+  document.querySelectorAll("#tablaSaber tbody tr")[i].querySelector(".c-pct").textContent = txt;
+  var n = MUNICIPIOS.filter(function(x){ var q = S.saber[x] || {}; return (entero(q.evaluados) > 0 && entero(q.integral) !== null) || num(q.pct) !== null; }).length;
+  document.getElementById("avanceSaber").textContent = n + " de 46 municipios con resultado de calidad.";
+}
+
+/* ---------- Parámetros ---------- */
+document.querySelectorAll("[data-param]").forEach(function(inp){
+  var k = inp.dataset.param;
+  inp.value = S.params[k] == null ? "" : (typeof S.params[k] === "number" ? String(S.params[k]).replace(".",",") : S.params[k]);
+  inp.addEventListener("input", function(){
+    S.params[k] = (k === "salario" || k === "retornoMedia") ? num(inp.value) : inp.value;
+    guardar();
+  });
+});
+function refrescarParams(){
+  document.querySelectorAll("[data-param]").forEach(function(inp){ var v = S.params[inp.dataset.param]; inp.value = v == null ? "" : (typeof v === "number" ? String(v).replace(".",",") : v); });
+}
+
+/* ---------- Excel: plantilla, importación, exportación ---------- */
+function msg(t){ document.getElementById("msgDatos").textContent = t; }
+function hojaMatricula(conDatos){
+  var enc = ["Municipio"].concat(ANIOS.map(function(a){ return a + " (grado " + grado(a) + "°)"; }));
+  var filas = MUNICIPIOS.map(function(m){ return [m].concat(ANIOS.map(function(a){ var v = conDatos ? valorMat(m,a) : null; return v === null ? "" : v; })); });
+  return XLSX.utils.aoa_to_sheet([enc].concat(filas));
+}
+function hojaSaber(conDatos){
+  var enc = ["Municipio","Evaluados en 11° (2026)","Estudiantes con niveles 3 o 4 en las 4 áreas","Porcentaje directo (opcional)"];
+  var filas = MUNICIPIOS.map(function(m){ var s = conDatos ? (S.saber[m]||{}) : {}; return [m, s.evaluados==null?"":s.evaluados, s.integral==null?"":s.integral, s.pct==null?"":s.pct]; });
+  return XLSX.utils.aoa_to_sheet([enc].concat(filas));
+}
+function anchos(ws, w){ ws["!cols"] = w.map(function(x){ return {wch:x}; }); return ws; }
+document.getElementById("btnPlantilla").addEventListener("click", function(){
+  var wb = XLSX.utils.book_new();
+  var ins = XLSX.utils.aoa_to_sheet([
+    ["Plantilla · Informe de trayectoria educativa, cohorte 2016–2026, Tolima (46 municipios no certificados, sin Ibagué)"],
+    [""],
+    ["Hoja «Matricula»: matrícula total del municipio en el grado que corresponde a la cohorte cada año: 2016 grado 1°, 2017 grado 2°, …, 2026 grado 11°."],
+    ["Fuente sugerida: SIMAT / Ministerio de Educación Nacional (matrícula por grado y municipio)."],
+    ["Hoja «Saber11»: número de evaluados en 2026 y número que alcanzó niveles 3 o 4 simultáneamente en matemáticas, lectura crítica, ciencias naturales y sociales y ciudadanas (ICFES)."],
+    ["Si solo dispone del porcentaje, escríbalo en la columna «Porcentaje directo» (por ejemplo 12,5)."],
+    ["No cambie los nombres de los municipios ni de las hojas. Las celdas vacías se interpretan como «sin dato»."]
+  ]);
+  XLSX.utils.book_append_sheet(wb, anchos(ins,[120]), "Instrucciones");
+  XLSX.utils.book_append_sheet(wb, anchos(hojaMatricula(false),[22].concat(ANIOS.map(function(){ return 16; }))), "Matricula");
+  XLSX.utils.book_append_sheet(wb, anchos(hojaSaber(false),[22,22,40,26]), "Saber11");
+  XLSX.writeFile(wb, "plantilla_cohorte_2016_2026_tolima.xlsx");
+});
+function buscarHoja(wb, nombre){
+  var n = normalizar(nombre);
+  for (var i = 0; i < wb.SheetNames.length; i++){ if (normalizar(wb.SheetNames[i]).indexOf(n) === 0) return wb.Sheets[wb.SheetNames[i]]; }
+  return null;
+}
+function importarLibro(wb){
+  var hm = buscarHoja(wb, "matricula"), hs = buscarHoja(wb, "saber");
+  if (!hm && !hs) throw new Error("El archivo no tiene hojas «Matricula» ni «Saber11». Use la plantilla de la aplicación.");
+  var nM = 0, nS = 0, noRec = {};
+  if (hm){
+    var rows = XLSX.utils.sheet_to_json(hm, {header:1, defval:""});
+    var enc = rows[0] || [], colAnio = {};
+    enc.forEach(function(c, j){ var r = String(c).match(/20(1[6-9]|2[0-6])/); if (r) colAnio[j] = +r[0]; });
+    if (!Object.keys(colAnio).length) throw new Error("La hoja «Matricula» no tiene columnas con los años 2016 a 2026 en la primera fila.");
+    rows.slice(1).forEach(function(r){
+      if (!String(r[0]).trim()) return;
+      var m = buscarMunicipio(r[0]); if (!m){ noRec[r[0]] = 1; return; }
+      Object.keys(colAnio).forEach(function(j){ var v = entero(r[j]); if (v !== null){ S.matricula[m] = S.matricula[m] || {}; S.matricula[m][colAnio[j]] = v; nM++; } });
+    });
+  }
+  if (hs){
+    var rs = XLSX.utils.sheet_to_json(hs, {header:1, defval:""});
+    rs.slice(1).forEach(function(r){
+      if (!String(r[0]).trim()) return;
+      var m = buscarMunicipio(r[0]); if (!m){ noRec[r[0]] = 1; return; }
+      var o = S.saber[m] = S.saber[m] || {}, e = entero(r[1]), g = entero(r[2]), p = num(r[3]);
+      if (e !== null) o.evaluados = e; if (g !== null) o.integral = g; if (p !== null) o.pct = p;
+      if (e !== null || g !== null || p !== null) nS++;
+    });
+  }
+  S.ejemplo = false;
+  guardar();
+  var nr = Object.keys(noRec);
+  return "Importación lista: " + nM + " valores de matrícula y " + nS + " municipios con Saber 11." + (nr.length ? " Filas no reconocidas: " + nr.join(", ") + "." : "");
+}
+document.getElementById("archivoExcel").addEventListener("change", function(ev){
+  var f = ev.target.files[0]; if (!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    try{ msg(importarLibro(XLSX.read(new Uint8Array(r.result), {type:"array"}))); renderCaptura(); }
+    catch(e){ msg("No se pudo leer el archivo: " + e.message); }
+    ev.target.value = "";
+  };
+  r.readAsArrayBuffer(f);
+});
+function exportarExcel(){
+  var C = calcular(), wb = XLSX.utils.book_new();
+  var res = [["Municipio","Matrícula 1° (2016)","Matrícula 11° (2026)","Permanencia (%)","Calidad Saber 11 (%)","Cruce permanencia × calidad (%)","Cuartil","Mayor caída anual (%)","Entre años"]];
+  C.filas.forEach(function(f){
+    res.push([f.m, f.m1, f.m11, r1(f.perm), r1(f.cal), r1(f.cruce), f.cuartil ? NOMBRE_CUARTIL[f.cuartil] : "", f.caida ? r1(f.caida.v) : null, f.caida ? f.caida.desde + "–" + f.caida.hasta : ""]);
+  });
+  res.push(["Tolima (46 municipios)", C.dep.m1, C.dep.m11, r1(C.dep.perm), r1(C.dep.cal), r1(C.dep.cruce), "", null, ""]);
+  var ret = [["Municipio"].concat(ANIOS.map(function(a){ return a + " (" + grado(a) + "°)"; }))];
+  C.filas.forEach(function(f){ ret.push([f.m].concat(f.ret.map(r1))); });
+  ret.push(["Tolima (46 municipios)"].concat(C.dep.ret.map(r1)));
+  XLSX.utils.book_append_sheet(wb, anchos(XLSX.utils.aoa_to_sheet(res),[24,16,16,14,16,24,20,18,12]), "Resultados");
+  XLSX.utils.book_append_sheet(wb, anchos(XLSX.utils.aoa_to_sheet(ret),[24].concat(ANIOS.map(function(){ return 11; }))), "Retencion_%");
+  XLSX.utils.book_append_sheet(wb, anchos(hojaMatricula(true),[22].concat(ANIOS.map(function(){ return 16; }))), "Matricula");
+  XLSX.utils.book_append_sheet(wb, anchos(hojaSaber(true),[22,22,40,26]), "Saber11");
+  XLSX.writeFile(wb, "informe_cohorte_2016_2026_tolima.xlsx");
+}
+function r1(v){ return v === null || v === undefined ? null : Math.round(v * 10) / 10; }
+document.getElementById("btnExportar").addEventListener("click", exportarExcel);
+document.getElementById("btnExportar2").addEventListener("click", exportarExcel);
+
+document.getElementById("btnRespaldo").addEventListener("click", function(){
+  var b = new Blob([JSON.stringify(S, null, 1)], {type:"application/json"});
+  var a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = "respaldo_cohorte_tolima.json";
+  document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+});
+document.getElementById("archivoJson").addEventListener("change", function(ev){
+  var f = ev.target.files[0]; if (!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    try{ var o = JSON.parse(r.result); if (!o.matricula) throw new Error("formato no reconocido"); var b = vacio(); o.params = Object.assign(b.params, o.params||{}); S = Object.assign(b, o); guardar(); refrescarParams(); renderCaptura(); msg("Respaldo restaurado."); }
+    catch(e){ msg("No se pudo restaurar: " + e.message); }
+    ev.target.value = "";
+  };
+  r.readAsText(f);
+});
+document.getElementById("btnBorrar").addEventListener("click", function(){
+  if (!confirm("¿Borrar todos los datos registrados en este navegador? Esta acción no se puede deshacer.")) return;
+  var p = S.params; S = vacio(); S.params = p; guardar(); renderCaptura(); msg("Datos borrados.");
+});
+document.getElementById("btnEjemplo").addEventListener("click", function(){
+  var hay = MUNICIPIOS.some(function(m){ return S.matricula[m] && Object.keys(S.matricula[m]).length; });
+  if (hay && !confirm("Esto reemplaza los datos actuales por datos FICTICIOS de ejemplo. ¿Continuar?")) return;
+  datosEjemplo(); guardar(); renderCaptura(); msg("Se cargaron datos ficticios para probar la aplicación. No los use para conclusiones.");
+});
+function datosEjemplo(){
+  var semilla = 20162026;
+  function azar(){ semilla = (semilla * 1103515245 + 12345) % 2147483648; return semilla / 2147483648; }
+  S.matricula = {}; S.saber = {}; S.ejemplo = true;
+  MUNICIPIOS.forEach(function(m){
+    var base = Math.round(60 + azar() * 700), v = base, o = {};
+    var fuerza = .55 + azar() * .4;
+    ANIOS.forEach(function(a, i){
+      if (i > 0){
+        var g = grado(a), tasa = g === 6 ? .1 : g === 10 ? .12 : g >= 7 ? .06 : .025;
+        v = Math.round(v * (1 - tasa * (1.6 - fuerza) + (azar() - .5) * .05));
+      }
+      o[a] = v;
+    });
+    S.matricula[m] = o;
+    var ev = Math.round(o[2026] * (.88 + azar() * .1));
+    S.saber[m] = {evaluados: ev, integral: Math.round(ev * (.02 + azar() * .2 * fuerza))};
+  });
+}
+
+/* ---------- Informe ---------- */
+var graficos = [];
+function destruir(){ graficos.forEach(function(g){ g.destroy(); }); graficos = []; }
+function baseOpts(){
+  var ink2 = cssVar("--ink2"), grid = cssVar("--grid");
+  Chart.defaults.font.family = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+  Chart.defaults.color = ink2;
+  return {grid: grid, ink2: ink2, s1: cssVar("--s1"), surface: cssVar("--surface"), ref1: cssVar("--ref1"), ref2: cssVar("--ref2")};
+}
+var pluginReferencias = {
+  id: "referencias",
+  afterDatasetsDraw: function(chart, args, o){
+    if (!o || !o.lineas) return;
+    var ctx = chart.ctx, x = chart.scales.x, a = chart.chartArea;
+    o.lineas.forEach(function(l, k){
+      var px = x.getPixelForValue(l.v); if (px < a.left || px > a.right) return;
+      ctx.save(); ctx.strokeStyle = l.color; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(px, a.top); ctx.lineTo(px, a.bottom); ctx.stroke();
+      ctx.fillStyle = l.color; ctx.font = "12px system-ui,sans-serif"; ctx.textAlign = px > a.right - 120 ? "right" : "left";
+      ctx.fillText(l.t, px + (ctx.textAlign === "right" ? -4 : 4), a.top + 12 + k * 15);
+      ctx.restore();
+    });
+  }
+};
+function heatColor(v){
+  if (v === null) return ["transparent", "var(--muted)"];
+  var pasos = ["#cde2fb","#b7d3f6","#9ec5f4","#86b6ef","#6da7ec","#5598e7","#3987e5","#2a78d6","#256abf","#1c5cab","#184f95"];
+  var i = Math.max(0, Math.min(10, Math.floor(v / 10)));
+  return [pasos[i], i >= 6 ? "#ffffff" : "#0b0b0b"];
+}
+function lista(arr){ return arr.length <= 1 ? arr.join("") : arr.slice(0,-1).join(", ") + " y " + arr[arr.length-1]; }
+
+function renderInforme(){
+  destruir();
+  var C = calcular(), d = C.dep, P = S.params, el = document.getElementById("informe");
+  var hoy = new Date().toLocaleDateString("es-CO", {year:"numeric", month:"long", day:"numeric"});
+  var h = "";
+  if (S.ejemplo) h += '<div class="banner">⚠ Este informe usa <b>datos ficticios de ejemplo</b>. Cargue los datos reales antes de difundirlo.</div>';
+  h += '<h1>' + esc(P.titulo || "Informe de trayectoria educativa") + '</h1>';
+  h += '<p class="nota">Cohorte que ingresó a grado 1° en 2016 y debería culminar grado 11° en 2026 · 46 municipios no certificados del Tolima (sin Ibagué)' +
+    (P.entidad ? ' · ' + esc(P.entidad) : '') + (P.autor ? ' · ' + esc(P.autor) : '') + ' · Generado el ' + hoy + '</p>';
+
+  if (!C.conM1){
+    el.innerHTML = h + '<div class="vacio">Aún no hay datos. Registre la matrícula de 2016 (grado 1°) y de los años siguientes en la pestaña «Matrícula año por año», importe la plantilla de Excel o cargue los datos de ejemplo en «Datos y parámetros».</div>';
+    return;
+  }
+  var completo = C.conPerm === 46 && C.conCal === 46;
+  if (!completo) h += '<div class="banner">Informe parcial: ' + C.conM1 + ' municipios con matrícula de 2016, ' + C.conPerm + ' con matrícula de 2026 y ' + C.conCal + ' con resultados Saber 11. Los agregados departamentales se calculan con los municipios que tienen los datos requeridos.</div>';
+
+  // 1. Contexto
+  h += '<h2>1. ¿Cuáles son los principales retos de la educación media en el Tolima?</h2>';
+  h += '<p>El informe «Las implicaciones de la inacción en la educación media en Colombia» (ORE – Universidad Icesi, Universidad Javeriana y Universidad de los Andes, enero 2026) muestra que solo 13 de cada 100 estudiantes que ingresan a grado 1° en Colombia llegan a grado 11° y desarrollan de manera integral las competencias básicas. Para la entidad territorial certificada del Tolima, que reúne a los 46 municipios no certificados analizados aquí, esa proporción fue de apenas ' + fmt(REF.tolima.cruce) + ' de cada 100 en la cohorte 2024 (cuartil más bajo del país), frente a ' + fmt(REF.ibague.cruce) + ' en Ibagué y ' + fmt(REF.colombia.cruce) + ' en el promedio nacional.</p>';
+  h += '<p>Este informe aplica la misma metodología a la cohorte que ingresó a grado 1° en 2016 y que, sin repitencia ni abandono, culmina grado 11° en 2026. Se sigue la matrícula de esa cohorte año por año, se triangula con los resultados de las Pruebas Saber 11 de 2026 y se estiman las implicaciones de no actuar.</p>';
+
+  // 2. Permanencia y calidad
+  var cien = d.cruce !== null ? Math.round(d.cruce) : null, llegan = d.perm !== null ? Math.round(Math.min(d.perm, 100)) : null;
+  h += '<h2>2. ¿Cuántos estudiantes de la cohorte 2016 llegan a grado 11° y desarrollan las competencias básicas?</h2>';
+  if (cien !== null) h += '<p class="destacado">De cada 100 estudiantes que ingresaron a grado 1° en 2016 en los municipios no certificados del Tolima, ' + llegan + ' llegaron a grado 11° en 2026 y solo ' + cien + ' lograron un desempeño integral en las competencias básicas.</p>';
+  else if (llegan !== null) h += '<p class="destacado">De cada 100 estudiantes que ingresaron a grado 1° en 2016, ' + llegan + ' llegaron a grado 11° en 2026. Falta registrar los resultados Saber 11 para completar el cruce con calidad.</p>';
+  else h += '<p class="destacado">La cohorte aún no tiene datos de 2026. A continuación se muestra la trayectoria registrada hasta el último año disponible.</p>';
+
+  if (llegan !== null){
+    var dots = "";
+    for (var i = 0; i < 100; i++){ dots += '<i class="' + (cien !== null && i < cien ? "int" : i < llegan ? "lle" : "") + '"></i>'; }
+    h += '<div class="puntos-wrap"><div class="puntos" role="img" aria-label="De cada 100 estudiantes: ' + llegan + ' llegan a 11°' + (cien !== null ? ', ' + cien + ' con competencias integrales' : '') + '">' + dots + '</div><div class="leyenda">' +
+      (cien !== null ? '<span><i style="background:var(--dot-integral)"></i>' + cien + ' llegan a 11° con desempeño integral</span>' : '') +
+      '<span><i style="background:var(--dot-llega)"></i>' + (cien !== null ? (llegan - cien) + ' llegan a 11° sin desempeño integral' : llegan + ' llegan a 11°') + '</span>' +
+      '<span><i style="background:var(--dot-no)"></i>' + (100 - llegan) + ' no llegan a 11° en 2026</span></div></div>';
+  }
+  h += '<div class="kpis">' +
+    kpi(pct(d.perm), "Permanencia: llegan a 11° en 2026 por cada 100 que iniciaron 1° en 2016", "ETC Tolima 2024: " + pct(REF.tolima.perm) + " · Colombia: " + pct(REF.colombia.perm)) +
+    kpi(pct(d.cal), "Calidad: estudiantes de 11° con niveles 3–4 en las cuatro áreas", "ETC Tolima 2024: " + pct(REF.tolima.cal) + " · Colombia: " + pct(REF.colombia.cal)) +
+    kpi(pct(d.cruce), "Cruce permanencia × calidad", "ETC Tolima 2024: " + pct(REF.tolima.cruce) + " · Colombia: " + pct(REF.colombia.cruce)) +
+    kpi(fmt(d.m1Total, 0), "Estudiantes matriculados en grado 1° en 2016", C.conM1 + " de 46 municipios con dato") + '</div>';
+
+  h += '<h3>Trayectoria de la cohorte año por año</h3>';
+  h += '<p>' + textoTrayectoria(C) + '</p>';
+  h += '<div class="grafico" style="height:300px"><canvas id="g-cohorte" aria-label="Porcentaje de la cohorte que permanece cada año"></canvas></div>';
+  h += '<div class="fuente">Gráfico 1. Matrícula de la cohorte en cada año como porcentaje de la matrícula de grado 1° en 2016, municipios no certificados del Tolima. Fuente: elaboración propia con datos de matrícula registrados en la aplicación.</div>';
+
+  // 3. Brechas
+  h += '<h2 class="salto">3. ¿De qué magnitud son las brechas entre municipios?</h2>';
+  h += '<p>' + textoBrechas(C) + '</p>';
+  var nBar = C.conCruce.length ? C.conCruce.length : C.filas.filter(function(f){ return f.perm !== null; }).length;
+  if (nBar){
+    h += '<div class="grafico" style="height:' + (nBar * 20 + 70) + 'px"><canvas id="g-municipios"></canvas></div>';
+    h += '<div class="fuente">Gráfico 2. ' + (C.conCruce.length ? 'Porcentaje estimado de estudiantes que ingresaron a 1° en 2016, llegaron a 11° en 2026 y lograron desempeño integral en Saber 11, por municipio.' : 'Porcentaje de estudiantes que ingresaron a 1° en 2016 y llegaron a 11° en 2026, por municipio.') + ' Las líneas verticales muestran las referencias de la cohorte 2024 del informe ORE (ETC Tolima y Colombia).</div>';
+  }
+  if (C.conCruce.length >= 3){
+    h += '<div class="grafico" style="height:340px"><canvas id="g-dispersion"></canvas></div>';
+    h += '<div class="fuente">Gráfico 3. Permanencia (eje horizontal) frente a calidad (eje vertical) por municipio. Cada punto es un municipio; pase el cursor para ver su nombre.</div>';
+  }
+
+  // 4. Inacción
+  h += '<h2>4. ¿Qué implica la inacción frente a la educación media?</h2>';
+  h += textoInaccion(C);
+
+  // 5. Conclusiones
+  h += '<h2>5. Conclusiones</h2><ul class="concl">' + conclusiones(C).map(function(t){ return '<li>' + t + '</li>'; }).join("") + '</ul>';
+
+  // Apéndices
+  h += '<h2 class="salto">Apéndice A. Resultados por municipio</h2>';
+  h += '<p class="nota">Haga clic en el encabezado de una columna para ordenar. Los cuartiles se calculan entre los municipios con cruce disponible.</p>';
+  h += '<div class="tabla-wrap"><table id="tablaResultados"></table></div>';
+  h += '<h2 class="salto">Apéndice B. Retención de la cohorte año por año (% frente a grado 1° en 2016)</h2>';
+  h += '<div class="tabla-wrap">' + tablaRetencion(C) + '</div>';
+  h += '<p class="fuente">Valores mayores a 100 % pueden deberse a migración de estudiantes hacia el municipio, a repitencia acumulada o a ajustes en el registro de matrícula.</p>';
+  h += '<h2>Nota metodológica</h2>';
+  h += '<p>Permanencia: matrícula total en grado 11° en 2026 dividida por la matrícula total en grado 1° en 2016. Es una aproximación por cohorte, no un seguimiento por estudiante, y supone que las entradas y salidas por repitencia y migración se compensan. Calidad: porcentaje de evaluados en Saber 11 que alcanzan niveles de desempeño 3 o 4 simultáneamente en matemáticas, lectura crítica, ciencias naturales y sociales y ciudadanas. Cruce: permanencia × calidad / 100, es decir, el porcentaje estimado de estudiantes que ingresaron a 1° y llegan a 11° con desempeño integral. No todos los estudiantes de 11° presentan la prueba y no se conoce el logro de quienes abandonaron, por lo que la proporción real puede ser menor. El agregado departamental suma la matrícula de los municipios con dato en 2016 y en cada año; la calidad departamental pondera por número de evaluados.</p>';
+  h += '<div class="refs"><h3>Referencias</h3>' +
+    '<p>Ruiz Patiño, J., Navia Jaramillo, S., Bernal, G. y Maldonado, D. (2026). Las implicaciones de la inacción en la educación media en Colombia. Observatorio de Realidades Educativas – Universidad Icesi.</p>' +
+    '<p>UNESCO, OECD y Commonwealth Secretariat (2024). El precio de la inacción: el costo global privado, fiscal y social de que los niños, niñas y jóvenes no aprendan. UNESCO Publishing.</p>' +
+    '<p>Sánchez Torres, F., Munari, A., Velasco Rodríguez, T., Ayala Guerrero, M. y Pulido Ramírez, X. (2016). Beneficios económicos y laborales de la educación media y acceso a la educación superior. Universidad de los Andes.</p>' +
+    '<p>Montenegro, C. E. y Patrinos, H. A. (2014). Comparable estimates of returns to schooling around the world. World Bank Policy Research Working Paper 7020.</p>' +
+    '<p>García-Suaza, A. F., Guataquí, J. C., Guerra, J. A. y Maldonado, D. (2014). Beyond the Mincer equation: the internal rate of return to higher education in Colombia. Education Economics, 22(3), 328–344.</p>' +
+    '<p>Datos de matrícula: Ministerio de Educación Nacional (SIMAT). Datos de calidad: ICFES, Pruebas Saber 11.</p></div>';
+
+  el.innerHTML = h;
+  tablaResultados(C, "cruce", -1);
+  dibujarGraficos(C);
+}
+function kpi(v, l, r){ return '<div class="kpi"><div class="v">' + v + '</div><div class="l">' + l + '</div>' + (r ? '<div class="r">' + r + '</div>' : '') + '</div>'; }
+
+function textoTrayectoria(C){
+  var d = C.dep, t = [], ult = null;
+  ANIOS.forEach(function(a, i){ if (d.ret[i] !== null) ult = i; });
+  if (ult === null) return "Sin datos suficientes.";
+  var hitos = [[4,"terminar la primaria (grado 5°, 2020)"],[8,"terminar la básica secundaria (grado 9°, 2024)"],[10,"llegar al último grado de la media (grado 11°, 2026)"]];
+  hitos.forEach(function(x){ if (d.ret[x[0]] !== null) t.push(fmt(Math.min(d.ret[x[0]],100),0) + " de cada 100 lograron " + x[1]); });
+  var peor = null;
+  for (var i = 1; i < ANIOS.length; i++){
+    if (d.ret[i] !== null && d.ret[i-1] !== null){
+      var c = d.ret[i] - d.ret[i-1];
+      if (peor === null || c < peor.c) peor = {c:c, i:i};
+    }
+  }
+  var s = t.length ? "Siguiendo la matrícula de la cohorte, " + lista(t) + ". " : "La cohorte tiene datos hasta " + ANIOS[ult] + " (grado " + grado(ANIOS[ult]) + "°), cuando conserva el " + pct(d.ret[ult]) + " de la matrícula inicial. ";
+  if (peor && peor.c < 0) s += "La mayor pérdida ocurre en el paso de grado " + grado(ANIOS[peor.i-1]) + "° (" + ANIOS[peor.i-1] + ") a grado " + grado(ANIOS[peor.i]) + "° (" + ANIOS[peor.i] + "), con " + fmt(-peor.c) + " puntos porcentuales menos de la cohorte.";
+  if (d.perm !== null) s += " La permanencia de la cohorte 2016–2026 (" + pct(d.perm) + ") se compara con " + pct(REF.tolima.perm) + " de la cohorte 2024 de la ETC Tolima y " + pct(REF.colombia.perm) + " del promedio nacional reportados por el ORE" + (d.perm > REF.tolima.perm ? ", lo que indica una mejora frente a la cohorte anterior." : ", lo que indica que no hubo mejora frente a la cohorte anterior.");
+  return s;
+}
+function textoBrechas(C){
+  var f = C.conCruce.slice().sort(function(a,b){ return b.cruce - a.cruce; });
+  var campo = "cruce", etiqueta = "llegan a 11° y logran desempeño integral";
+  if (!f.length){
+    f = C.filas.filter(function(x){ return x.perm !== null; }).sort(function(a,b){ return b.perm - a.perm; });
+    campo = "perm"; etiqueta = "llegan a 11°";
+    if (!f.length) return "Se requiere la matrícula de 2016 y 2026 por municipio para analizar las brechas.";
+  }
+  var top = f.slice(0,3).map(function(x){ return x.m + " (" + fmt(x[campo]) + ")"; });
+  var bot = f.slice(-3).reverse().map(function(x){ return x.m + " (" + fmt(x[campo]) + ")"; });
+  var max = f[0][campo], min = f[f.length-1][campo];
+  var s = "Mientras en " + lista(top) + " la mayor proporción de estudiantes que ingresaron a 1° en 2016 " + etiqueta + " (por cada 100), en " + lista(bot) + " esta proporción es la más baja del departamento. ";
+  if (min > 0) s += "La brecha entre el municipio con mejor y peor resultado es de " + fmt(max / min) + " veces. ";
+  else s += "Al menos un municipio no registra estudiantes en esta condición. ";
+  if (campo === "cruce"){
+    var sobreCol = f.filter(function(x){ return x.cruce >= REF.colombia.cruce; }).length, bajoTol = f.filter(function(x){ return x.cruce < REF.tolima.cruce; }).length;
+    s += sobreCol + " de " + f.length + " municipios igualan o superan el promedio nacional de la cohorte 2024 (" + fmt(REF.colombia.cruce) + ") y " + bajoTol + " están por debajo del valor de la ETC Tolima en esa cohorte (" + fmt(REF.tolima.cruce) + "). ";
+    s += "Ibagué, excluida de este análisis por ser entidad certificada, registró " + fmt(REF.ibague.cruce) + " en 2024.";
+  }
+  return s;
+}
+function textoInaccion(C){
+  var d = C.dep, P = S.params, s = "";
+  var noLlegan = (d.m1 !== null && d.m11 !== null) ? Math.max(0, d.m1 - d.m11) : null;
+  var sinComp = (d.m11 !== null && d.cal !== null) ? Math.round(d.m11 * (1 - d.cal / 100)) : null;
+  s += '<p>La educación, además de ser un camino para el desarrollo personal y la movilidad social, se traduce en mayores ingresos, consumo, recaudo fiscal e innovación. No garantizar trayectorias completas y de calidad tiene un costo triple —privado, fiscal y social— que se acumula con cada cohorte que abandona o egresa sin las competencias necesarias.</p>';
+  if (noLlegan !== null){
+    s += '<div class="kpis">' + kpi(fmt(noLlegan,0), "estudiantes de la cohorte 2016 que no llegaron a grado 11° en 2026", "Diferencia entre matrícula de 1° (2016) y de 11° (2026)") +
+      (sinComp !== null ? kpi(fmt(sinComp,0), "estudiantes en 11° sin desempeño integral en las cuatro áreas", "Matrícula 2026 × (1 − calidad)") : "");
+    var sal = num(P.salario), rt = num(P.retornoMedia);
+    if (sal && rt){
+      var perdida = noLlegan * sal * 12 * rt / 100;
+      s += kpi("$ " + fmt(perdida / 1e6, 0) + " millones", "ingresos anuales que dejarían de percibir quienes no culminan la media (estimación ilustrativa)", fmt(noLlegan,0) + " jóvenes × salario de referencia de $ " + fmt(sal,0) + " × 12 × " + fmt(rt) + " %");
+    }
+    s += '</div>';
+  }
+  s += '<p>La evidencia citada por el informe nacional muestra que en América Latina y el Caribe cada punto porcentual adicional de abandono escolar significa pérdidas superiores a 30.000 millones de dólares al año, y cada punto adicional de niños y niñas sin competencias básicas cuesta cerca de 50.000 millones de dólares anuales (UNESCO, OECD y Commonwealth Secretariat, 2024). Cada año adicional de escolaridad genera en promedio 10,1 % más de ingresos a lo largo de la vida (Montenegro y Patrinos, 2014).</p>';
+  s += '<p>En Colombia, un joven que completa la educación media obtiene un salario cerca de 28 % superior al de quien solo termina la primaria, y el retorno marginal de terminar la media frente a iniciarla sin terminarla es de 16,5 % (Sánchez et al., 2016). Culminar la media habilita además la educación superior, cuya rentabilidad llega al 14 % (García-Suaza et al., 2014), por encima de la de un CDT (cerca de 8 % anual) o de proyectos energéticos de la región (10 % en promedio). Cada año que se posterga la transformación de la educación media en el Tolima, los municipios renuncian a parte de su crecimiento potencial y de su bienestar colectivo.</p>';
+  return s;
+}
+function conclusiones(C){
+  var d = C.dep, c = [];
+  if (d.cruce !== null) c.push("<b>Solo " + fmt(d.cruce) + " de cada 100 estudiantes que ingresaron a grado 1° en 2016 en los municipios no certificados del Tolima llegaron a grado 11° en 2026 y lograron desarrollar de manera integral las competencias básicas</b>, frente a " + fmt(REF.colombia.cruce) + " en el promedio nacional de la cohorte 2024.");
+  else if (d.perm !== null) c.push("<b>" + fmt(d.perm) + " de cada 100 estudiantes que ingresaron a grado 1° en 2016 llegaron a grado 11° en 2026.</b> Falta completar los resultados Saber 11 para estimar el desarrollo integral de competencias.");
+  if (d.perm !== null) c.push("La permanencia de la cohorte (" + pct(d.perm) + ") " + (d.perm >= REF.colombia.perm ? "alcanza o supera" : "sigue por debajo de") + " el promedio nacional (" + pct(REF.colombia.perm) + "): cerca de " + fmt(Math.max(0, 100 - Math.min(d.perm, 100)), 0) + " de cada 100 niños y niñas no completaron su trayectoria en el tiempo esperado.");
+  var f = (C.conCruce.length ? C.conCruce : []).slice().sort(function(a,b){ return b.cruce - a.cruce; });
+  if (f.length >= 2){
+    c.push("Las brechas entre municipios son amplias: " + f[0].m + " registra " + fmt(f[0].cruce) + " de cada 100 y " + f[f.length-1].m + " " + fmt(f[f.length-1].cruce) + ". " +
+      f.filter(function(x){ return x.cuartil === 1; }).length + " municipios están en el cuartil más bajo y requieren atención prioritaria: " + lista(f.filter(function(x){ return x.cuartil === 1; }).map(function(x){ return x.m; })) + ".");
+  }
+  c.push("La inacción frente a la educación media se traduce en menor productividad, estancamiento del crecimiento y pérdida de bienestar social. La media debe asegurar competencias básicas —en particular para quienes llegan a ella sin tenerlas—, abrir espacios de exploración vocacional y ofrecer oportunidades para construir un proyecto de vida.");
+  return c;
+}
+function tablaRetencion(C){
+  var h = '<table><thead><tr><th>Municipio</th>' + ANIOS.map(function(a){ return '<th class="num">' + a + '<br><span class="nota">' + grado(a) + '°</span></th>'; }).join("") + '</tr></thead><tbody>';
+  function fila(nombre, arr, neg){
+    return '<tr><td>' + (neg ? '<b>' + nombre + '</b>' : esc(nombre)) + '</td>' + arr.map(function(v){ var c = heatColor(v); return '<td class="heat" style="background:' + c[0] + ';color:' + c[1] + '">' + (v === null ? "—" : fmt(v, 0)) + '</td>'; }).join("") + '</tr>';
+  }
+  C.filas.forEach(function(f){ h += fila(f.m, f.ret); });
+  h += fila("Tolima (46 municipios)", C.dep.ret, true);
+  return h + '</tbody></table>';
+}
+function tablaResultados(C, campo, dir){
+  var cols = [["m","Municipio"],["m1","Matrícula 1° 2016"],["m11","Matrícula 11° 2026"],["perm","Permanencia %"],["cal","Calidad %"],["cruce","Cruce %"],["cuartil","Cuartil"]];
+  var f = C.filas.slice().sort(function(a,b){
+    var x = a[campo], y = b[campo];
+    if (x === null && y === null) return 0; if (x === null) return 1; if (y === null) return -1;
+    return (typeof x === "string" ? x.localeCompare(y, "es") : x - y) * dir;
+  });
+  var h = '<thead><tr>' + cols.map(function(c){ return '<th class="ord' + (c[0] === "m" || c[0] === "cuartil" ? '' : ' num') + '" data-c="' + c[0] + '">' + c[1] + '</th>'; }).join("") + '</tr></thead><tbody>';
+  f.forEach(function(x){
+    h += '<tr><td>' + esc(x.m) + '</td><td class="num">' + fmt(x.m1,0) + '</td><td class="num">' + fmt(x.m11,0) + '</td><td class="num">' + fmt(x.perm) + '</td><td class="num">' + fmt(x.cal) + '</td><td class="num"><b>' + fmt(x.cruce) + '</b></td><td>' + (x.cuartil ? NOMBRE_CUARTIL[x.cuartil] : "—") + '</td></tr>';
+  });
+  var d = C.dep;
+  h += '<tr><td><b>Tolima (46 municipios)</b></td><td class="num"><b>' + fmt(d.m1,0) + '</b></td><td class="num"><b>' + fmt(d.m11,0) + '</b></td><td class="num"><b>' + fmt(d.perm) + '</b></td><td class="num"><b>' + fmt(d.cal) + '</b></td><td class="num"><b>' + fmt(d.cruce) + '</b></td><td>—</td></tr>';
+  var t = document.getElementById("tablaResultados");
+  t.innerHTML = h + '</tbody>';
+  t.querySelectorAll("th.ord").forEach(function(th){
+    th.addEventListener("click", function(){ var c = th.dataset.c; tablaResultados(C, c, c === campo ? -dir : (c === "m" ? 1 : -1)); });
+  });
+}
+function dibujarGraficos(C){
+  var o = baseOpts(), d = C.dep;
+  var eje = {grid:{color:o.grid}, border:{color:o.grid}, ticks:{color:o.ink2}};
+  var c1 = document.getElementById("g-cohorte");
+  if (c1){
+    graficos.push(new Chart(c1, {type:"line",
+      data:{labels: ANIOS.map(function(a){ return [String(a), "Grado " + grado(a) + "°"]; }),
+        datasets:[{label:"% de la cohorte", data:d.ret, borderColor:o.s1, backgroundColor:o.s1, borderWidth:2, pointRadius:4, pointHoverRadius:6, pointBorderColor:o.surface, pointBorderWidth:2, tension:0, spanGaps:false}]},
+      options:{responsive:true, maintainAspectRatio:false, animation:false, interaction:{mode:"index", intersect:false},
+        plugins:{legend:{display:false}, tooltip:{callbacks:{label:function(x){ return " " + pct(x.parsed.y) + " de la matrícula de 1° (2016) · " + fmt(d.total[x.dataIndex],0) + " estudiantes"; }}}},
+        scales:{x:eje, y:Object.assign({}, eje, {min:0, suggestedMax:100, ticks:{color:o.ink2, callback:function(v){ return v + " %"; }}})}}}));
+  }
+  var c2 = document.getElementById("g-municipios");
+  if (c2){
+    var usaCruce = C.conCruce.length > 0, campo = usaCruce ? "cruce" : "perm";
+    var f = C.filas.filter(function(x){ return x[campo] !== null; }).sort(function(a,b){ return b[campo] - a[campo]; });
+    var ref = usaCruce ? [{v:REF.colombia.cruce, t:"Colombia 2024: " + fmt(REF.colombia.cruce), color:o.ref1},{v:REF.tolima.cruce, t:"ETC Tolima 2024: " + fmt(REF.tolima.cruce), color:o.ref2}]
+                       : [{v:REF.colombia.perm, t:"Colombia 2024: " + fmt(REF.colombia.perm), color:o.ref1},{v:REF.tolima.perm, t:"ETC Tolima 2024: " + fmt(REF.tolima.perm), color:o.ref2}];
+    graficos.push(new Chart(c2, {type:"bar", plugins:[pluginReferencias],
+      data:{labels: f.map(function(x){ return x.m; }), datasets:[{data: f.map(function(x){ return x[campo]; }), backgroundColor:o.s1, borderRadius:{topRight:4, bottomRight:4}, borderSkipped:"start", barPercentage:.75, categoryPercentage:.9}]},
+      options:{indexAxis:"y", responsive:true, maintainAspectRatio:false, animation:false,
+        plugins:{legend:{display:false}, referencias:{lineas:ref},
+          tooltip:{callbacks:{label:function(x){ var r = f[x.dataIndex]; return usaCruce ? [" Cruce: " + pct(r.cruce), " Permanencia: " + pct(r.perm), " Calidad: " + pct(r.cal)] : " Permanencia: " + pct(r.perm); }}}},
+        scales:{x:Object.assign({}, eje, {min:0, position:"top", ticks:{color:o.ink2, callback:function(v){ return v + " %"; }}}), y:{grid:{display:false}, ticks:{color:o.ink2, autoSkip:false, font:{size:11}}}}}}));
+  }
+  var c3 = document.getElementById("g-dispersion");
+  if (c3){
+    var pts = C.conCruce.map(function(x){ return {x:x.perm, y:x.cal, m:x.m}; });
+    graficos.push(new Chart(c3, {type:"scatter",
+      data:{datasets:[{data:pts, backgroundColor:o.s1, borderColor:o.surface, borderWidth:2, pointRadius:6, pointHoverRadius:8, pointHitRadius:10}]},
+      options:{responsive:true, maintainAspectRatio:false, animation:false,
+        plugins:{legend:{display:false}, tooltip:{callbacks:{label:function(x){ var p = x.raw; return " " + p.m + ": permanencia " + pct(p.x) + ", calidad " + pct(p.y); }}}},
+        scales:{x:Object.assign({}, eje, {title:{display:true, text:"Permanencia (%)", color:o.ink2}}), y:Object.assign({}, eje, {min:0, title:{display:true, text:"Calidad Saber 11 (%)", color:o.ink2}})}}}));
+  }
+}
+document.getElementById("btnImprimir").addEventListener("click", function(){ window.print(); });
+window.addEventListener("beforeprint", function(){ graficos.forEach(function(g){ g.resize(); }); });
+window.addEventListener("afterprint", function(){ graficos.forEach(function(g){ g.resize(); }); });
+if (window.matchMedia){
+  var mq = window.matchMedia("(prefers-color-scheme: dark)");
+  var alCambiar = function(){ if (document.getElementById("p-informe").classList.contains("activo")) renderInforme(); };
+  if (mq.addEventListener) mq.addEventListener("change", alCambiar);
+}
+
+/* ---------- Inicio ---------- */
+renderCaptura();
+try{
+  var tabGuardada = sessionStorage.getItem(CLAVE+"-tab");
+  if (tabGuardada){ var bt = document.querySelector('nav.tabs button[data-tab="'+tabGuardada+'"]'); if (bt) bt.click(); }
+}catch(e){}
+</script>
+</body>
+</html>
